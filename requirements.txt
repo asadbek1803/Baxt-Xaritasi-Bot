@@ -1,0 +1,4 @@
+Django==5.2.2
+django-import-export==4.3.7
+aiogram==3.20.0.post0
+aiohttp==3.11.18
