@@ -2,3 +2,8 @@ Django==5.2.2
 django-import-export==4.3.7
 aiogram==3.20.0.post0
 aiohttp==3.11.18
+django-unfold==0.59.0
+requests==2.32.4
+asgiref==3.8.1
+async-timeout==5.0.1
+python-dotenv==1.0.0
