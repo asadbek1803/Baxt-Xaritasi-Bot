@@ -1,21 +1,679 @@
 from django.contrib import admin
-from .models import TelegramUser, MandatoryChannel
-from django.contrib.auth.models import User, Group
+from django.utils.html import format_html
+from django.urls import reverse
+from unfold.admin import ModelAdmin, TabularInline
+from django.utils.safestring import mark_safe
+from django.contrib import messages
+from django.utils import timezone
+from .models import (
+    TelegramUser, Konkurslar, Payments, 
+    KonkursParticipant, MandatoryChannel, PrivateChannel, Notification,
+    Kurslar, CourseParticipant
+)
 
-# Unregister the default User and Group models
-admin.site.unregister(User)
-admin.site.unregister(Group)
+# PrivateChannel Inline - Konkurs ichida qo'shish uchun
+class PrivateChannelInline(TabularInline):
+    model = PrivateChannel
+    extra = 1  # Yangi konkurs yaratganda 1 ta bo'sh form
+    fields = ('name', 'telegram_id', 'invite_link', 'is_active')
+    verbose_name = "Yopiq Kanal"
+    verbose_name_plural = "Yopiq Kanallar"
+    
+    def has_add_permission(self, request, obj):
+        return request.user.is_superuser or request.user.has_perm('bot.add_privatechannel')
+    
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser or request.user.has_perm('bot.change_privatechannel')
+    
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser or request.user.has_perm('bot.delete_privatechannel')
 
-@admin.register(TelegramUser)
-class TelegramUserAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'phone_number', 'region', 'age', 'is_confirmed', 'registration_date')
-    search_fields = ('first_name', 'last_name', 'phone_number', 'telegram_username')
-    list_filter = ('region', 'is_confirmed')
-    ordering = ('-registration_date',)
 
+# KonkursPayment Inline - Konkursga bog'liq to'lovlarni ko'rish uchun
+class PaymentsInline(TabularInline):
+    model = Payments
+    extra = 0
+    max_num = 0  # Yangi qo'shish imkoniyatini olib tashlash
+    readonly_fields = ('user', 'amount', 'payment_date', 'get_payment_screenshot_thumbnail', 'status')
+    fields = ('user', 'amount', 'status', 'get_payment_screenshot_thumbnail', 'payment_date')
+    
+    def get_queryset(self, request):
+        # Faqat konkursga tegishli to'lovlarni ko'rsatish
+        qs = super().get_queryset(request)
+        return qs.filter(payment_type='KONKURS')
+    
+    def get_payment_screenshot_thumbnail(self, obj):
+        if obj.payment_screenshot:
+            return format_html(
+                '<img src="{}" style="max-width: 100px; max-height: 100px; border-radius: 5px;" />',
+                obj.payment_screenshot.url
+            )
+        return "Skrinshot yo'q"
+    get_payment_screenshot_thumbnail.short_description = "Skrinshot"
+    
+    def has_add_permission(self, request, obj):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
+    verbose_name = "Konkurs to'lovi"
+    verbose_name_plural = "Konkurs to'lovlari"
+
+
+# KonkursParticipant Inline - Ishtirokchilarni ko'rish uchun
+class KonkursParticipantInline(TabularInline):
+    model = KonkursParticipant
+    extra = 0
+    readonly_fields = ('user', 'payment', 'joined_date', 'private_channel_invited')
+    fields = ('user', 'payment', 'joined_date', 'private_channel_invited')
+    
+    def has_add_permission(self, request, obj):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
+    verbose_name = "Ishtirokchi"
+    verbose_name_plural = "Konkurs ishtirokchilari"
+
+class CourseParticipantInline(TabularInline):
+    model = CourseParticipant
+    extra = 0
+    readonly_fields = ('user', 'payment', 'joined_date', 'private_channel_invited')
+    fields = ('user', 'payment', 'joined_date', 'private_channel_invited')
+    
+    def has_add_permission(self, request, obj):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
+    verbose_name = "Ishtirokchi"
+    verbose_name_plural = "Kurs ishtirokchilari"
+
+class CoursePaymentsInline(TabularInline):
+    model = Payments
+    extra = 0
+    max_num = 0
+    readonly_fields = ('user', 'amount', 'payment_date', 'get_payment_screenshot_thumbnail', 'status')
+    fields = ('user', 'amount', 'status', 'get_payment_screenshot_thumbnail', 'payment_date')
+    
+    def get_queryset(self, request):
+        # Faqat kursga tegishli to'lovlarni ko'rsatish
+        qs = super().get_queryset(request)
+        return qs.filter(payment_type='COURSE')
+    
+    def get_payment_screenshot_thumbnail(self, obj):
+        if obj.payment_screenshot:
+            return format_html(
+                '<img src="{}" style="max-width: 100px; max-height: 100px; border-radius: 5px;" />',
+                obj.payment_screenshot.url
+            )
+        return "Skrinshot yo'q"
+    get_payment_screenshot_thumbnail.short_description = "Skrinshot"
+    
+    def has_add_permission(self, request, obj):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
+    verbose_name = "Kurs to'lovi"
+    verbose_name_plural = "Kurs to'lovlari"
+
+
+
+
+# ASOSIY KONKURS ADMIN
+@admin.register(Konkurslar)
+class KonkurslarAdmin(ModelAdmin):
+    # Inline-lar qo'shish
+    inlines = [PrivateChannelInline, PaymentsInline, KonkursParticipantInline]
+    
+    # List display
+    list_display = (
+        'title', 
+        'start_date', 
+        'end_date', 
+        'price',
+        'get_participants_count',
+        'get_pending_payments_count',
+        'get_mandatory_channels_count',
+        'get_private_channels_count', 
+        'is_active',
+        'created_at'
+    )
+    
+    # Search va Filter
+    search_fields = ('title', 'description')
+    list_filter = (
+        'is_active', 
+        'start_date', 
+        'end_date', 
+        'created_at',
+        'konkurs_mandatory_channels'
+    )
+    
+    # Ordering
+    ordering = ('-created_at',)
+    date_hierarchy = 'start_date'
+    
+    # Fieldsets - ma'lumotlarni guruhlash
+    fieldsets = (
+        ('Asosiy Ma\'lumotlar', {
+            'fields': ('title', 'description', 'price')
+        }),
+        ('Vaqt Sozlamalari', {
+            'fields': ('start_date', 'end_date', 'is_active')
+        }),
+        ('Qo\'shimcha Sozlamalar', {
+            'fields': ('max_participants', 'winner_count'),
+            'classes': ('collapse',)  # Yig'ilgan holda ko'rsatish
+        }),
+        ('Majburiy Kanallar', {
+            'fields': ('konkurs_mandatory_channels',)
+        }),
+    )
+    
+    # Many-to-Many fieldlar uchun filter
+    filter_horizontal = ('konkurs_mandatory_channels',)
+    
+    # Read-only fields
+    readonly_fields = ('created_at', 'get_participants_count')
+    
+    # Custom methods for list_display
+    def get_participants_count(self, obj):
+        return obj.participants.filter(payment__status='CONFIRMED').count()
+    get_participants_count.short_description = 'Ishtirokchilar'
+    get_participants_count.admin_order_field = 'participants__count'
+    
+    def get_pending_payments_count(self, obj):
+        pending_count = obj.payments.filter(status='PENDING').count()
+        if pending_count > 0:
+            return format_html(
+                '<span style="background-color: #ffc107; color: #000; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{}</span>',
+                pending_count
+            )
+        return pending_count
+    get_pending_payments_count.short_description = 'Kutilayotgan to\'lovlar'
+    
+    def get_mandatory_channels_count(self, obj):
+        return obj.konkurs_mandatory_channels.count()
+    get_mandatory_channels_count.short_description = 'Majburiy Kanallar'
+    
+    def get_private_channels_count(self, obj):
+        return obj.private_channels.count()
+    get_private_channels_count.short_description = 'Yopiq Kanallar'
+    
+    # Actions
+    actions = ['activate_konkurs', 'deactivate_konkurs']
+    
+    def activate_konkurs(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(
+            request, 
+            f'{updated} ta konkurs faollashtirildi.'
+        )
+    activate_konkurs.short_description = "Tanlangan konkurslarni faollashtirish"
+    
+    def deactivate_konkurs(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(
+            request, 
+            f'{updated} ta konkurs o\'chirildi.'
+        )
+    deactivate_konkurs.short_description = "Tanlangan konkurslarni o'chirish"
+    
+    # Formfield customization
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == "konkurs_mandatory_channels":
+            kwargs["queryset"] = MandatoryChannel.objects.filter(is_active=True)
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+
+@admin.register(Payments)
+class PaymentsAdmin(ModelAdmin):
+    list_display = (
+        'get_user_info',
+        'get_payment_type_info',
+        'amount', 
+        'get_status_badge',
+        'get_screenshot_thumbnail',
+        'payment_date',
+        'get_admin_actions'
+    )
+    
+    search_fields = ('user__full_name', 'konkurs__title', 'course__name', 'user__phone_number', 'user__telegram_id')
+    
+    list_filter = (
+        'status', 
+        'payment_type',
+        'payment_date', 
+        'confirmed_date',
+        'konkurs',
+        'course',
+        'konkurs__is_active',
+        'course__is_active'
+    )
+    
+    ordering = ('-payment_date',)
+    date_hierarchy = 'payment_date'
+    
+    # Fieldsets - Batafsil ko'rish uchun
+    fieldsets = (
+        ('To\'lov Ma\'lumotlari', {
+            'fields': ('user', 'payment_type', 'course', 'konkurs', 'amount', 'status')
+        }),
+        ('Skrinshot', {
+            'fields': ('payment_screenshot', 'get_full_screenshot'),
+        }),
+        ('Vaqt Ma\'lumotlari', {
+            'fields': ('payment_date', 'confirmed_date'),
+        }),
+        ('Tasdiqlash Ma\'lumotlari', {
+            'fields': ('confirmed_by', 'rejection_reason'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('payment_date', 'get_full_screenshot')
+    
+    # Custom methods
+    def get_user_info(self, obj):
+        return format_html(
+            '<strong>{}</strong><br/>'
+            '<small>📱 {}</small><br/>'
+            '<small>🆔 {}</small>',
+            obj.user.full_name,
+            obj.user.phone_number,
+            obj.user.telegram_id
+        )
+    get_user_info.short_description = "Foydalanuvchi"
+    
+    def get_payment_type_info(self, obj):
+        if obj.payment_type == 'KONKURS' and obj.konkurs:
+            return format_html(
+                '<strong>🎯 {}:</strong><br/>'
+                '<small>{}</small><br/>'
+                '<small>💰 {} so\'m</small>',
+                obj.get_payment_type_display(),
+                obj.konkurs.title[:30] + ("..." if len(obj.konkurs.title) > 30 else ""),
+                obj.konkurs.price
+            )
+        elif obj.payment_type == 'COURSE' and obj.course:
+            return format_html(
+                '<strong>📚 {}:</strong><br/>'
+                '<small>{}</small><br/>'
+                '<small>💰 {} so\'m</small>',
+                obj.get_payment_type_display(),
+                obj.course.name[:30] + ("..." if len(obj.course.name) > 30 else ""),
+                obj.course.price
+            )
+        return obj.get_payment_type_display()
+    get_payment_type_info.short_description = "To'lov turi"
+    
+    def get_status_badge(self, obj):
+        colors = {
+            'PENDING': '#ffc107',
+            'CONFIRMED': '#28a745', 
+            'REJECTED': '#dc3545'
+        }
+        icons = {
+            'PENDING': '⏳',
+            'CONFIRMED': '✅',
+            'REJECTED': '❌'
+        }
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 4px 12px; border-radius: 15px; font-weight: bold; display: inline-block;">'
+            '{} {}</span>',
+            colors.get(obj.status, '#6c757d'),
+            icons.get(obj.status, ''),
+            obj.get_status_display()
+        )
+    get_status_badge.short_description = "Status"
+    
+    def get_screenshot_thumbnail(self, obj):
+        if obj.payment_screenshot:
+            return format_html(
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 80px; max-height: 80px; border-radius: 8px; border: 2px solid #ddd;" />'
+                '</a>',
+                obj.payment_screenshot.url,
+                obj.payment_screenshot.url
+            )
+        return format_html('<span style="color: #888;">📷 Yo\'q</span>')
+    get_screenshot_thumbnail.short_description = "Skrinshot"
+    
+    def get_full_screenshot(self, obj):
+        """To'liq o'lchamdagi skrinshot ko'rish uchun"""
+        if obj.payment_screenshot:
+            return format_html(
+                '<a href="{}" target="_blank">'
+                '<img src="{}" style="max-width: 500px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />'
+                '</a><br/><br/>'
+                '<a href="{}" target="_blank" style="background: #007bff; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">'
+                '🔍 To\'liq o\'lchamda ochish'
+                '</a>',
+                obj.payment_screenshot.url,
+                obj.payment_screenshot.url,
+                obj.payment_screenshot.url
+            )
+        return "Skrinshot yuklanmagan"
+    get_full_screenshot.short_description = "To'liq Skrinshot"
+    
+    def get_admin_actions(self, obj):
+        """Tezkor amallar tugmalari"""
+        if obj.status == 'PENDING':
+            return format_html(
+                '<div style="display: flex; gap: 5px;">'
+                '<a href="{}?action=confirm&ids={}" onclick="return confirm(\'Rostdan ham tasdiqlamoqchimisiz?\')" '
+                'style="background: #28a745; color: white; padding: 4px 8px; text-decoration: none; border-radius: 3px; font-size: 12px;">'
+                '✅ Tasdiqlash</a>'
+                '<a href="{}?action=reject&ids={}" onclick="return confirm(\'Rostdan ham rad etmoqchimisiz?\')" '
+                'style="background: #dc3545; color: white; padding: 4px 8px; text-decoration: none; border-radius: 3px; font-size: 12px;">'
+                '❌ Rad etish</a>'
+                '</div>',
+                reverse('admin:bot_payments_changelist'), obj.id,
+                reverse('admin:bot_payments_changelist'), obj.id
+            )
+        elif obj.status == 'CONFIRMED':
+            return format_html(
+                '<span style="color: #28a745; font-weight: bold;">✅ Tasdiqlangan</span><br/>'
+                '<small>{}</small>',
+                obj.confirmed_date.strftime('%d.%m.%Y %H:%M') if obj.confirmed_date else ''
+            )
+        else:
+            return format_html(
+                '<span style="color: #dc3545; font-weight: bold;">❌ Rad etilgan</span><br/>'
+                '<small>{}</small>',
+                obj.rejection_reason[:50] + "..." if obj.rejection_reason and len(obj.rejection_reason) > 50 else obj.rejection_reason or ""
+            )
+    get_admin_actions.short_description = "Amallar"
+    
+    # Actions
+    actions = ['confirm_selected_payments', 'reject_selected_payments', 'mark_as_pending']
+    
+    def confirm_selected_payments(self, request, queryset):
+        """Tanlangan to'lovlarni tasdiqlash"""
+        pending_payments = queryset.filter(status='PENDING')
+        count = 0
+        
+        for payment in pending_payments:
+            payment.confirm_payment()  # Bu endi modeldagi metodni chaqiradi
+            count += 1
+            
+        self.message_user(
+            request, 
+            f'{count} ta to\'lov tasdiqlandi.',
+            messages.SUCCESS
+        )
+    confirm_selected_payments.short_description = "✅ Tanlangan to'lovlarni tasdiqlash"
+    
+    def reject_selected_payments(self, request, queryset):
+        """Tanlangan to'lovlarni rad etish"""
+        pending_payments = queryset.filter(status='PENDING')
+        count = pending_payments.update(
+            status='REJECTED',
+            confirmed_date=timezone.now(),
+            rejection_reason="Admin tomonidan rad etildi"
+        )
+        
+        self.message_user(
+            request, 
+            f'{count} ta to\'lov rad etildi.',
+            messages.WARNING
+        )
+    reject_selected_payments.short_description = "❌ Tanlangan to'lovlarni rad etish"
+    
+    def mark_as_pending(self, request, queryset):
+        """Qayta ko'rib chiqish uchun PENDING qilish"""
+        count = queryset.update(
+            status='PENDING',
+            confirmed_date=None,
+            confirmed_by=None,
+            rejection_reason=""
+        )
+        
+        self.message_user(
+            request, 
+            f'{count} ta to\'lov kutish holatiga o\'tkazildi.',
+            messages.INFO
+        )
+    mark_as_pending.short_description = "⏳ Kutish holatiga o'tkazish"
+    
+    # URL lar orqali tezkor amallar (GET parametrlari orqali)
+    def changelist_view(self, request, extra_context=None):
+        if 'action' in request.GET:
+            action = request.GET['action']
+            ids = request.GET.get('ids', '').split(',')
+            
+            if action == 'confirm' and ids:
+                try:
+                    payment = Payments.objects.get(id=ids[0])
+                    if payment.status == 'PENDING':
+                        payment.confirm_payment()  # Modeldagi metodni ishlatamiz
+                        
+                        self.message_user(
+                            request,
+                            f'To\'lov (ID: {payment.id}) tasdiqlandi!',
+                            messages.SUCCESS
+                        )
+                except Payments.DoesNotExist:
+                    self.message_user(
+                        request,
+                        'To\'lov topilmadi!',
+                        messages.ERROR
+                    )
+            
+            elif action == 'reject' and ids:
+                try:
+                    payment = Payments.objects.get(id=ids[0])
+                    if payment.status == 'PENDING':
+                        payment.status = 'REJECTED'
+                        payment.confirmed_date = timezone.now()
+                        payment.rejection_reason = "Admin tomonidan rad etildi"
+                        payment.save()
+                        
+                        self.message_user(
+                            request,
+                            f'To\'lov (ID: {payment.id}) rad etildi!',
+                            messages.WARNING
+                        )
+                except Payments.DoesNotExist:
+                    self.message_user(
+                        request,
+                        'To\'lov topilmadi!',
+                        messages.ERROR
+                    )
+        
+        return super().changelist_view(request, extra_context)
+
+
+
+# KONKURSPARTICIPANT ADMIN
+@admin.register(KonkursParticipant)
+class KonkursParticipantAdmin(ModelAdmin):
+    list_display = (
+        'user', 
+        'konkurs', 
+        'joined_date',
+        'private_channel_invited',
+        'get_payment_status'
+    )
+    search_fields = ('user__full_name', 'konkurs__title')
+    list_filter = (
+        'konkurs', 
+        'joined_date',
+        'private_channel_invited',
+        'payment__status'
+    )
+    ordering = ('-joined_date',)
+    
+    def get_payment_status(self, obj):
+        return obj.payment.get_status_display()
+    get_payment_status.short_description = 'To\'lov holati'
+
+
+
+@admin.register(Kurslar)
+class KurslarAdmin(ModelAdmin):
+    inlines = [CoursePaymentsInline, CourseParticipantInline]
+    list_display = (
+        'name', 
+        'price', 
+        'is_active', 
+        'created_at'
+    )
+    search_fields = ('name', 'description')
+    list_filter = ('is_active', 'created_at')
+    ordering = ('-created_at',)
+    
+    fieldsets = (
+        ('Yashirin kanallar', {
+            'fields': ('private_channel', )
+        }),
+        ('Asosiy Ma\'lumotlar', {
+            'fields': ('name', 'description', 'price')
+        }),
+        ('Vaqt Sozlamalari', {
+            'fields': ('start_date', 'end_date', 'is_active')
+        }),
+    )
+    
+    readonly_fields = ('created_at',)
+    
+   
+    
+
+@admin.register(CourseParticipant)
+class CourseParticipantAdmin(ModelAdmin):
+    list_display = (
+        'user', 
+        'course', 
+        'joined_date',
+        'get_payment_status'
+    )
+    search_fields = ('user__full_name', 'course__name')
+    list_filter = ('course', 'joined_date', 'payment__status')
+    ordering = ('-joined_date',)
+    
+    def get_payment_status(self, obj):
+        return obj.payment.get_status_display()
+    get_payment_status.short_description = 'To\'lov holati'
+
+
+# PRIVATECHANNEL ALOHIDA ADMIN (agar kerak bo'lsa)
+@admin.register(PrivateChannel)
+class PrivateChannelAdmin(ModelAdmin):
+    list_display = ('name', 'konkurs', 'telegram_id', 'is_active', 'created_at')
+    search_fields = ('name', 'konkurs__title', 'telegram_id')
+    list_filter = ('is_active', 'konkurs', 'created_at')
+    ordering = ('-created_at',)
+    
+    # Konkurs bo'yicha filter
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "konkurs":
+            kwargs["queryset"] = Konkurslar.objects.filter(is_active=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+# MANDATORYCHANNEL ADMIN
 @admin.register(MandatoryChannel)
-class MandatoryChannelAdmin(admin.ModelAdmin):
-    list_display = ('name', 'telegram_id', 'is_active')
+class MandatoryChannelAdmin(ModelAdmin):
+    list_display = ('name', 'telegram_id', 'is_telegram', 'is_private', 'is_active', 'get_konkurs_count')
     search_fields = ('name', 'telegram_id')
-    list_filter = ('is_active',)
+    list_filter = ('is_telegram', 'is_private', 'is_active', 'created_at')
     ordering = ('name',)
+    
+    def get_konkurs_count(self, obj):
+        return obj.konkurslar.count()
+    get_konkurs_count.short_description = 'Konkurslar soni'
+
+
+# TELEGRAMUSER ADMIN
+@admin.register(TelegramUser)
+class TelegramUserAdmin(ModelAdmin):
+    list_display = (
+        'full_name', 
+        'telegram_username', 
+        'phone_number', 
+        'region',
+        'age',
+        'is_confirmed', 
+        'is_admin', 
+        'referral_count',
+        'registration_date'
+    )
+    search_fields = ('full_name', 'telegram_username', 'phone_number', 'telegram_id')
+    list_filter = (
+        'is_confirmed', 
+        'is_admin', 
+        'is_blocked',
+        'gender', 
+        'region', 
+        'registration_date'
+    )
+    ordering = ('-registration_date', )
+    date_hierarchy = 'registration_date'
+    
+    # Fieldsets
+    fieldsets = (
+        ('Telegram Ma\'lumotlari', {
+            'fields': ('telegram_id', 'telegram_username', 'full_name')
+        }),
+        ('Aloqa Ma\'lumotlari', {
+            'fields': ('phone_number', 'region', 'profession')
+        }),
+        ('Shaxsiy Ma\'lumotlar', {
+            'fields': ('gender', 'age',)
+        }),
+        ('Referral Tizimi', {
+            'fields': ('invited_by', 'referral_code', 'referral_count'),
+            'classes': ('collapse',)
+        }),
+        ('Tasdiqlash', {
+            'fields': ('is_confirmed', 'confirmed_by', 'confirmation_date')
+        }),
+        ('Huquqlar', {
+            'fields': ('is_admin', 'is_blocked')
+        }),
+        ('Faoliyat', {
+            'fields': ('registration_date', ),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('registration_date', 'referral_count', 'age', )
+
+
+@admin.register(Notification)
+class NotificationAdmin(ModelAdmin):
+    list_display = ('title', 'recipient', 'notification_type', 'is_read', 'created_at')
+    search_fields = ('title', 'message', 'recipient__full_name')
+    list_filter = ('is_read', 'notification_type', 'created_at')
+    ordering = ('-created_at',)
+    
+    fieldsets = (
+        ('Asosiy Ma\'lumotlar', {
+            'fields': ('recipient', 'sender', 'notification_type', 'title', 'message')
+        }),
+        ('Holat', {
+            'fields': ('is_read', 'read_at')
+        }),
+        ('Vaqt', {
+            'fields': ('created_at',)
+        }),
+        ('Qo\'shimcha', {
+            'fields': ('extra_data',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('created_at', 'read_at')
+
+
+# Admin panelni sozlash
+admin.site.site_header = "Konkurs Bot Boshqaruvi"
+admin.site.site_title = "Konkurs Bot Admin"
+admin.site.index_title = "Boshqaruv Paneli"

@@ -1,10 +1,19 @@
 from aiogram import Router
-
-from .check_subscribe import router as subscription_router
 from .start import router as start_router
+from .check_subscribe import router as subscription_router
+from .back import router as back_router
+from .my_profile import router as my_profile_router
+from .buy_course import router as buy_course
+
 
 
 router = Router()
 
-router.include_router(subscription_router)
+
 router.include_router(start_router)
+router.include_router(subscription_router)
+router.include_router(back_router) 
+router.include_router(buy_course)
+router.include_router(my_profile_router)
+
+# router.include_router(konkurslar_router)

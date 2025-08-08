@@ -8,10 +8,9 @@ logger = logging.getLogger(__name__)
 async def create_user(
     telegram_id: str,
     phone_number: str,
-    first_name: str,
-    last_name: str,
+    full_name: str,
+    age: str,
     telegram_username: str,
-    age: int,
     profession: str,
     region: str,
     gender: str
@@ -27,10 +26,9 @@ async def create_user(
         user = await sync_to_async(_create_user_sync)(
             telegram_id=telegram_id,
             phone_number=phone_number,
-            first_name=first_name,
-            last_name=last_name,
+            full_name=full_name,
+            age = age,
             telegram_username=telegram_username,
-            age=age,
             profession=profession,
             region=region,
             gender=gender
@@ -58,7 +56,7 @@ async def update_user(chat_id: str, **kwargs) -> bool:
     Updates user data with proper connection handling and validation
     """
     allowed_fields = {
-        "phone_number", "first_name", "last_name",
+        "phone_number", "full_name", 
         "telegram_username", "age", "region",
         "profession", "is_confirmed", "gender"
     }

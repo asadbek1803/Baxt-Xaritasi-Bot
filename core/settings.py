@@ -25,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-2)h%6&fi_(_3*uzd^gkep9)7ywo%c3y+cr-k2*g3dv=b0y@e#l'
+TELEGRAM_BOT_USERNAME = 'BaxtXaritasiBot'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -35,11 +36,11 @@ ALLOWED_HOSTS = ["*"]  # Allow all hosts for development; change in production
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['https://918aaedd748e.ngrok-free.app/']
+CSRF_TRUSTED_ORIGINS = ['https://bdbf83145082.ngrok-free.app']
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = '918aaedd748e.ngrok-free.app'
+CSRF_COOKIE_DOMAIN = 'bdbf83145082.ngrok-free.app'
 CORS_ORIGIN_WHITELIST = (
-    'https://918aaedd748e.ngrok-free.app'
+    'https://bdbf83145082.ngrok-free.app'
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ########### End Cors 
@@ -62,6 +63,8 @@ INSTALLED_APPS = [
     'bot',  # Telegram bot application
 
     ### Third-party apps
+    'django_extensions',
+
 ]
 
 MIDDLEWARE = [
@@ -141,6 +144,26 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATICFILES_DIRS = [BASE_DIR / 'static']
+MEDIA_URL = '/media/'  # Should be single /media/
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # Points to your media folder
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Admin CSS qo'shish uchun
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
+
+# File upload sozlamalari
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10MB
+FILE_UPLOAD_PERMISSIONS = 0o644
+
+# Ruxsat berilgan fayl turlari
+ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -152,7 +175,7 @@ UNFOLD = {
     "SITE_HEADER": "Baxt Xaritasi Bot Admin",
     "SITE_SUBHEADER": "Admin panel",
     "SITE_URL": "/",
-    "SITE_SYMBOL": "sprint",  # symbol from icon set
+    "SITE_SYMBOL": "favorite",  # symbol from icon set
     "SHOW_HISTORY": True,  # show/hide "History" button, default: True
     "SHOW_VIEW_ON_SITE": True,  # show/hide "View on site" button, default: True
     "SHOW_BACK_BUTTON": False,
@@ -198,7 +221,43 @@ UNFOLD = {
                         "link": reverse_lazy("admin:bot_mandatorychannel_changelist"),
                         "icon": "link",
                     },
-                   
+
+                    {
+                        "title": ("Konkurslar"),
+                        "link": reverse_lazy("admin:bot_konkurslar_changelist"),
+                        "icon": "trophy",
+                    },
+
+                    {
+                        "title": ("Bildirishnomalar"),
+                        "link": reverse_lazy("admin:bot_notification_changelist"),
+                        "icon": "notifications",
+
+                    },
+
+                    {
+                        "title": ("To'lovlar"),
+                        "link": reverse_lazy("admin:bot_payments_changelist"),
+                        "icon": "payment",
+                    },
+
+                    {
+                        "title": ("Konkurs qatnashchilari"),
+                        "link": reverse_lazy("admin:bot_konkursparticipant_changelist"),
+                        "icon": "group_add",
+                    },
+                    {
+                        "title": ("Kurs qatnashchilari"),
+                        "link": reverse_lazy("admin:bot_courseparticipant_changelist"),
+                        "icon": "group_add",
+                    },
+
+                    {
+                        "title": ("Kurslar"),
+                        "link": reverse_lazy("admin:bot_kurslar_changelist"),
+                        "icon": "book",
+                    },
+
                 ],
             }
         ],
