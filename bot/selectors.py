@@ -3,17 +3,27 @@ from django.db.models import Q
 from .models import (
     TelegramUser,
     MandatoryChannel,
-    Konkurslar,
     Payments,
     Kurslar
    
 )
 from datetime import datetime
+# Level mapping dictionary
+LEVEL_MAPPING = {
+    "1-bosqich": "level_1",
+    "2-bosqich": "level_2", 
+    "3-bosqich": "level_3",
+    "4-bosqich": "level_4",
+    "5-bosqich": "level_5",
+    # Agar boshqa levellar ham bo'lsa qo'shishingiz mumkin
+}
+
+# Teskari mapping
+REVERSE_LEVEL_MAPPING = {v: k for k, v in LEVEL_MAPPING.items()}
 
 @sync_to_async
 def fetch_user(chat_id: str):
     return TelegramUser.objects.filter(telegram_id=chat_id).first()
-
 
 async def get_user(chat_id: str) -> bool | TelegramUser:
     user = await fetch_user(chat_id)
@@ -24,6 +34,52 @@ def create_user(user_data: dict):
     """Yangi foydalanuvchi yaratish"""
     return TelegramUser.objects.create(**user_data)
 
+@sync_to_async
+def get_user_level(telegram_id):
+    """
+    Foydalanuvchini levelini olish
+    """
+    try:
+        user = TelegramUser.objects.filter(telegram_id=telegram_id).first()
+        if user:
+            print(f"User found: {user.full_name}, Level: {user.level}")
+            return user.level
+        else:
+            print(f"User not found for telegram_id: {telegram_id}")
+            return None
+    except Exception as e:
+        print(f"Error getting user level: {e}")
+        return None
+
+@sync_to_async
+def get_level_kurs(level: str):
+    """
+    Ma'lum level bo'yicha faol kursni olish - Mapping bilan
+    """
+    try:
+        # User level-ini course level formatiga o'girish
+        course_level = LEVEL_MAPPING.get(level, level)
+        print(f"Looking for course with user level: {level}, mapped to course level: {course_level}")
+        
+        course = Kurslar.objects.filter(is_active=True, level=course_level).order_by('-created_at').first()
+        
+        if course:
+            print(f"Found course: {course.name}, Level: {course.level}")
+        else:
+            print(f"No course found for level: {course_level}")
+            # Barcha faol kurslarni ko'rsatish
+            all_courses = list(Kurslar.objects.filter(is_active=True).values('name', 'level'))
+            print(f"Available courses: {all_courses}")
+            
+            # Agar aniq level topilmasa, birinchi faol kursni qaytarish
+            course = Kurslar.objects.filter(is_active=True).order_by('-created_at').first()
+            if course:
+                print(f"Using first available course: {course.name}")
+                
+        return course
+    except Exception as e:
+        print(f"Error getting course: {e}")
+        return None
 
 @sync_to_async
 def get_referrer_by_id(telegram_id: str):
@@ -41,62 +97,13 @@ def get_all_channels():
     return list(MandatoryChannel.objects.filter(is_active=True))
 
 @sync_to_async
-def get_konkurs_participants(konkurs_id):
-    konkurs = Konkurslar.objects.filter(id=konkurs_id).first()
-    if konkurs:
-        return list(konkurs.participants.filter(
-            payments__status='CONFIRMED'
-        ).distinct())
-    return []
-
-
-
-
-@sync_to_async
-def get_active_konkurslar():
-    now = datetime.now()
-    return list(Konkurslar.objects.filter(
-        is_active=True,
-        start_date__lte=now,
-        end_date__gte=now
-    ).order_by('-created_at'))
-
-@sync_to_async
-def get_konkurs_details(konkurs_id):
-    return Konkurslar.objects.filter(id=konkurs_id).first()
-
-
-@sync_to_async
-def get_konkurs_participants_count(konkurs_id):
-    konkurs = Konkurslar.objects.get(id=konkurs_id)
-    return konkurs.payments.filter(status='CONFIRMED').values('user').distinct().count()
-
-@sync_to_async
-def is_konkurs_full(konkurs_id):
-    konkurs = Konkurslar.objects.get(id=konkurs_id)
-    if konkurs.max_participants:
-        return get_konkurs_participants_count.__wrapped__(konkurs_id) >= konkurs.max_participants
-    return False
-
-@sync_to_async
 def get_user_active_payments(user_id):
     """Foydalanuvchining faol (tasdiqlangan va muddati tugamagan) to'lovlarini olish"""
     return list(Payments.objects.filter(
         Q(user__telegram_id=user_id),
         Q(status='CONFIRMED'),
-        Q(konkurs__isnull=False) & Q(konkurs__end_date__gte=datetime.now()) | 
         Q(course__isnull=False) & Q(course__is_active=True)
     ))
-
-@sync_to_async
-def get_active_konkurslar():
-    """Faol konkurslarni olish"""
-    now = datetime.now()
-    return list(Konkurslar.objects.filter(
-        is_active=True,
-        start_date__lte=now,
-        end_date__gte=now
-    ).order_by('-created_at'))
 
 @sync_to_async
 def get_active_kurslar():
@@ -106,17 +113,12 @@ def get_active_kurslar():
     ).order_by('-created_at'))
 
 @sync_to_async
-def get_konkurs_details(konkurs_id):
-    """Konkurs tafsilotlarini olish"""
-    return Konkurslar.objects.filter(id=konkurs_id).first()
-
-@sync_to_async
 def get_kurs_details(kurs_id):
     """Kurs tafsilotlarini olish"""
     return Kurslar.objects.filter(id=kurs_id).first()
 
 @sync_to_async
-def create_payment_request(user_id, payment_type, amount, konkurs_id=None, kurs_id=None, photo_path=None):
+def create_payment_request(user_id, payment_type, amount, kurs_id=None, photo_path=None):
     """Yangi to'lov so'rovini yaratish"""
     user = TelegramUser.objects.filter(telegram_id=user_id).first()
     if not user:
@@ -128,10 +130,8 @@ def create_payment_request(user_id, payment_type, amount, konkurs_id=None, kurs_
         amount=amount,
         status='PENDING'
     )
-    
-    if payment_type == 'KONKURS' and konkurs_id:
-        payment.konkurs = Konkurslar.objects.filter(id=konkurs_id).first()
-    elif payment_type == 'COURSE' and kurs_id:
+
+    if payment_type == 'COURSE' and kurs_id:
         payment.course = Kurslar.objects.filter(id=kurs_id).first()
     
     if photo_path:
@@ -141,21 +141,12 @@ def create_payment_request(user_id, payment_type, amount, konkurs_id=None, kurs_
     return payment
 
 @sync_to_async
-def get_konkurs_participants_count(konkurs_id):
-    """Konkurs ishtirokchilari sonini olish"""
-    return Payments.objects.filter(
-        konkurs_id=konkurs_id,
-        status='CONFIRMED'
-    ).values('user').distinct().count()
-
-@sync_to_async
 def get_kurs_participants_count(kurs_id):
     """Kurs ishtirokchilari sonini olish"""
     return Payments.objects.filter(
         course_id=kurs_id,
         status='CONFIRMED'
     ).values('user').distinct().count()
-
 
 @sync_to_async
 def confirm_payment(payment_id, admin_user_id):
@@ -201,6 +192,45 @@ def get_user_buy_course(telegram_id):
 @sync_to_async
 def get_all_active_courses():
     """
-    Barcha faol kurslarni olish.
+    Barcha faol kurslarni olish (QuerySet).
+    """
+    return Kurslar.objects.filter(is_active=True).order_by('-created_at')
+
+@sync_to_async
+def get_first_active_course():
+    """Birinchi faol kursni olish"""
+    return Kurslar.objects.filter(is_active=True).order_by('-created_at').first()
+
+@sync_to_async
+def get_all_active_courses_list():
+    """
+    Barcha faol kurslarni olish - list qaytaradi, QuerySet emas
     """
     return list(Kurslar.objects.filter(is_active=True).order_by('-created_at'))
+
+
+@sync_to_async
+def get_course_by_user_level(user_level: str):
+    """
+    Foydalanuvchi leveliga mos birinchi faol kursni olish
+    """
+    try:
+        # User level-ini course level formatiga o'girish
+        course_level = LEVEL_MAPPING.get(user_level, user_level)
+        print(f"Looking for course with user level: {user_level}, mapped to course level: {course_level}")
+        
+        # Faqat shu levelga mos faol kursni olish
+        course = Kurslar.objects.filter(
+            is_active=True, 
+            level=course_level
+        ).order_by('-created_at').first()
+        
+        if course:
+            print(f"Found course for level {course_level}: {course.name}")
+        else:
+            print(f"No course found for level: {course_level}")
+            
+        return course
+    except Exception as e:
+        print(f"Error getting course by user level: {e}")
+        return None

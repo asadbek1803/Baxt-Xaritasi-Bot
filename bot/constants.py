@@ -45,6 +45,36 @@ GENDER = [
     ("F", "Ayol"),
 ]
 
+AGE_CHOICES = [
+        ('18-24', '18-24'),
+        ('25-34', '25-34'),
+        ('35-44', '35-44'),
+        ('45+', '45+'),
+    ]
+
+LEVEL_CHOICES = [
+    ('level_1', "1-bosqich"),
+    ('level_2', "2-bosqich"),
+    ('level_3', "3-bosqich"),
+    ('level_4', "4-bosqich"),
+    ('level_5', "5-bosqich"),
+    ('level_6', "6-bosqich"),
+    ('level_7', "7-bosqich"),
+]
+
+# Statuslar Choices
+STATUS_CHOICES = [
+        ('PENDING', 'Kutilmoqda'),
+        ('CONFIRMED', 'Tasdiqlangan'),
+        ('REJECTED', 'Rad etilgan')
+    ]
+
+PAYMENT_TYPES = [
+        ('KONKURS', 'Konkurs to\'lovi'),
+        ('COURSE', 'Kurs to\'lovi'),
+        ('DONATION', 'Xayriya to\'lovi')
+    ]
+
 # Button Enum
 
 class Button(Enum):
@@ -84,6 +114,13 @@ class Messages(Enum):
     select_profession_success = "✅ Siz {profession} kasbini tanladingiz."
     gender_error = "❌ Iltimos, jinsingizni tanlang: Erkak yoki Ayol."
     too_requests = "❗️ Siz juda ko'p so'rov yubordingiz. Iltimos, bir necha daqiqa kuting va qaytadan urinib ko'ring."
-
-
+    # To'lov rekvizitlari
+    
+    payment_details = (
+        "💳 <b>To'lov uchun rekvizitlar:</b>\n"
+        "🏦 Karta raqami: <code>{card_number}</code>\n"
+        "👤 Ism: {owner_name}\n\n"
+        "💰 To'lov summasi: <b>{amount} so'm</b>\n\n"
+        "📸 To'lovni amalga oshirib, chek (screenshot) yuboring."
+    )
 

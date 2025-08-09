@@ -9,3 +9,8 @@ class UserRegistrationState(StatesGroup):
     GET_GENDER = State()
     
 
+
+# FSM holatlari
+class BuyCourseState(StatesGroup):
+    WAITING_FOR_SCREENSHOT = State()
+

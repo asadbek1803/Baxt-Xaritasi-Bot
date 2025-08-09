@@ -36,11 +36,11 @@ ALLOWED_HOSTS = ["*"]  # Allow all hosts for development; change in production
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['https://bdbf83145082.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://0e4fb32ef016.ngrok-free.app']
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = 'bdbf83145082.ngrok-free.app'
+CSRF_COOKIE_DOMAIN = '0e4fb32ef016.ngrok-free.app'
 CORS_ORIGIN_WHITELIST = (
-    'https://bdbf83145082.ngrok-free.app'
+    'https://0e4fb32ef016.ngrok-free.app'
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ########### End Cors 
@@ -222,11 +222,6 @@ UNFOLD = {
                         "icon": "link",
                     },
 
-                    {
-                        "title": ("Konkurslar"),
-                        "link": reverse_lazy("admin:bot_konkurslar_changelist"),
-                        "icon": "trophy",
-                    },
 
                     {
                         "title": ("Bildirishnomalar"),
@@ -241,11 +236,6 @@ UNFOLD = {
                         "icon": "payment",
                     },
 
-                    {
-                        "title": ("Konkurs qatnashchilari"),
-                        "link": reverse_lazy("admin:bot_konkursparticipant_changelist"),
-                        "icon": "group_add",
-                    },
                     {
                         "title": ("Kurs qatnashchilari"),
                         "link": reverse_lazy("admin:bot_courseparticipant_changelist"),

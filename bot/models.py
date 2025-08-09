@@ -3,19 +3,19 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 from datetime import datetime
-from .constants import REGIONS
+from .constants import (
+    REGIONS,
+    GENDER as GENDER_CHOICES,
+    AGE_CHOICES,
+    LEVEL_CHOICES, 
+    STATUS_CHOICES,
+    PAYMENT_TYPES
+
+
+    
+    )
 
 class TelegramUser(models.Model):
-    AGE_CHOICES = [
-        ('18-24', '18-24'),
-        ('25-34', '25-34'),
-        ('35-44', '35-44'),
-        ('45+', '45+'),
-    ]
-    GENDER_CHOICES = [
-        ('M', 'Erkak'),
-        ('F', 'Ayol'),
-    ]
     telegram_id = models.CharField(
         max_length=50, unique=True, 
         help_text="Foydalanuvchining Telegram ID", verbose_name="Telegram ID")
@@ -31,6 +31,11 @@ class TelegramUser(models.Model):
         verbose_name="Yoshi"
         )
 
+    level = models.CharField(
+        max_length=20, help_text="Foydalanuvchi darajasi",
+        choices=LEVEL_CHOICES, 
+        verbose_name="Foydalanuvchi darajasi"
+    )
 
     phone_number = models.CharField(
         max_length=20, unique=True,
@@ -116,12 +121,6 @@ class TelegramUser(models.Model):
             self.save()
         bot_username = "testBot"
         return f"https://t.me/{bot_username}?start={self.referral_code}"
-    def can_join_contest(self, contest):
-        # Kurs to'lovi qilinganligini tekshirish
-        if not self.has_active_course():
-            return False
-        # Konkursga allaqachon qo'shilganligini tekshirish
-        return not self.konkurs_participants.filter(konkurs=contest).exists()
     
     def __str__(self):
         return f"{self.full_name} ({self.phone_number})"
@@ -148,6 +147,11 @@ class Kurslar(models.Model):
         verbose_name="Kurs uchun tavsif",
         help_text="Kurs uchun tavsif bering"
         )
+    level = models.CharField(
+        max_length=20, choices=LEVEL_CHOICES,
+        verbose_name="Kurs darajasi",
+        help_text="Kurs bosqichi (Har bir bosqichda 1 ta kurs)"
+    )
     private_channel = models.URLField(
         verbose_name="Kurs uchun yopiq kanal",
         help_text= "Kurs uchun yopiq kanal  joylang"
@@ -190,77 +194,11 @@ class Kurslar(models.Model):
 
 
 
-class Konkurslar(models.Model):
-    title = models.CharField(max_length=255, verbose_name="Konkurs nomi")
-    description = models.TextField(verbose_name="Konkurs tavsifi")
-    price = models.DecimalField(
-        max_digits=10, decimal_places=2, verbose_name="Konkurs narxi",
-        help_text="Konkurs uchun to'lov narxi")
-    konkurs_mandatory_channels = models.ManyToManyField(
-        'MandatoryChannel', blank=True, related_name='konkurslar',
-        verbose_name="Majburiy kanallar",
-        help_text="Konkurs uchun majburiy kanallar")
-    
-    start_date = models.DateField(verbose_name="Boshlanish sanasi", help_text="Konkurs boshlanish sanasi ($MM/DD/YYYY)")
-    end_date = models.DateField(verbose_name="Tugash sanasi")
-    is_active = models.BooleanField(default=True, verbose_name="Faoliyat holati")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Yaratilgan sana")
-    
-    # Qo'shimcha maydonlar
-    max_participants = models.PositiveIntegerField(
-        null=True, blank=True, 
-        verbose_name="Maksimal ishtirokchilar soni",
-        help_text="Konkursga maksimal ishtirokchilar soni (bo'sh bo'lsa cheksiz)"
-    )
-    winner_count = models.PositiveIntegerField(
-        default=1, 
-        verbose_name="G'oliblar soni",
-        help_text="Konkursda g'olib bo'luvchilar soni"
-    )
-
-    def clean(self):
-        if self.start_date and self.end_date:
-            if self.start_date >= self.end_date:
-                raise ValidationError('Tugash sanasi boshlanish sanasidan keyin bo\'lishi kerak.')
-        if self.winner_count < 1:
-            raise ValidationError('G\'oliblar soni kamida 1 ta bo\'lishi kerak.')
-
-    def get_participants_count(self):
-        return self.payments.filter(status='CONFIRMED').values('user').distinct().count()
-    
-    def is_full(self):
-        if self.max_participants:
-            return self.get_participants_count() >= self.max_participants
-        return False
-    
-    def is_ongoing(self):
-        now = timezone.now()
-        return self.start_date <= now <= self.end_date
-
-    def __str__(self):
-        return self.title
-
-    class Meta:
-        verbose_name = "Konkurs"
-        verbose_name_plural = "Konkurslar"
-        ordering = ['-created_at']
-
 
 class Payments(models.Model):
-    STATUS_CHOICES = [
-        ('PENDING', 'Kutilmoqda'),
-        ('CONFIRMED', 'Tasdiqlangan'),
-        ('REJECTED', 'Rad etilgan')
-    ]
-    PAYMENT_TYPES = [
-        ('KONKURS', 'Konkurs to\'lovi'),
-        ('COURSE', 'Kurs to\'lovi'),
-        ('DONATION', 'Xayriya to\'lovi')
-    ]
     user = models.ForeignKey(TelegramUser, on_delete=models.CASCADE, related_name='payments',
                              verbose_name="Foydalanuvchi", help_text="To'lov qilgan foydalanuvchi")
     course = models.ForeignKey(Kurslar, on_delete=models.CASCADE, related_name='payments',verbose_name="Kurs", help_text="To'lov qilingan kurs", null=True, blank=True)
-    konkurs = models.ForeignKey(Konkurslar, on_delete=models.CASCADE, related_name='payments',verbose_name="Konkurs", help_text="To'lov qilingan konkurs", null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2,
                                  verbose_name="To'lov miqdori", help_text="To'lov miqdori")
     payment_screenshot = models.ImageField(
@@ -316,7 +254,11 @@ class Payments(models.Model):
         self.status = 'CONFIRMED'
         self.is_confirmed = True
         self.confirmed_date = timezone.now()
+        self.user.level = "2-bosqich"
+        
+        self.user.save()
         self.save()
+        
         
         # Kurs to'lovi bo'lsa
         if self.payment_type == 'COURSE' and self.course:
@@ -331,18 +273,9 @@ class Payments(models.Model):
                 referrer.referral_count += 1
                 referrer.save()
         
-        # Konkurs to'lovi bo'lsa
-        elif self.payment_type == 'KONKURS' and self.konkurs:
-            KonkursParticipant.objects.get_or_create(
-                user=self.user,
-                konkurs=self.konkurs,
-                payment=self
-            )
-    
+       
     def __str__(self):
-        if self.konkurs:
-            return f"{self.user.full_name} - {self.konkurs.title} ({self.amount}) [{self.get_status_display()}]"
-        elif self.course:
+        if self.course:
             return f"{self.user.full_name} - {self.course.name} ({self.amount}) [{self.get_status_display()}]"
         return f"{self.user.full_name} - {self.amount} [{self.get_status_display()}]"
     
@@ -352,86 +285,10 @@ class Payments(models.Model):
         ordering = ['-payment_date']
         indexes = [
             models.Index(fields=['status', 'payment_date']),
-            models.Index(fields=['user', 'konkurs']),
             models.Index(fields=['user', 'course']),
         ]
 
 
-
-
-# class KonkursPayment(models.Model):
-#     STATUS_CHOICES = [
-#         ('PENDING', 'Kutilmoqda'),
-#         ('CONFIRMED', 'Tasdiqlangan'),
-#         ('REJECTED', 'Rad etilgan')
-#     ]
-    
-#     user = models.ForeignKey(TelegramUser, on_delete=models.CASCADE, related_name='payments',
-#     verbose_name="Foydalanuvchi", help_text="To'lov qilgan foydalanuvchi")
-#     konkurs = models.ForeignKey(Konkurslar, on_delete=models.CASCADE, related_name='payments', 
-#     verbose_name="Konkurs", help_text="To'lov qilingan konkurs")
-#     amount = models.DecimalField(max_digits=10, decimal_places=2,
-#     verbose_name="To'lov miqdori", help_text="To'lov miqdori")
-#     payment_screenshot = models.ImageField(
-#         upload_to='payments', null=True, blank=True, 
-#         verbose_name="To'lov skrinshoti",
-#         help_text="To'lov skrinshoti (agar mavjud bo'lsa)")
-#     payment_date = models.DateTimeField(auto_now_add=True, verbose_name="To'lov sanasi",
-#     help_text="To'lov amalga oshirilgan sana")
-    
-#     # Status maydonlari
-#     status = models.CharField(
-#         max_length=20,
-#         choices=STATUS_CHOICES,
-#         default='PENDING',
-#         verbose_name="To'lov holati",
-#         help_text="To'lov holati: Kutilmoqda, Tasdiqlangan yoki Rad etilgan"
-#     )
-    
-#     # Tasdiqlovchi admin va sanasi
-#     confirmed_by = models.ForeignKey(
-#         TelegramUser, on_delete=models.SET_NULL, null=True, blank=True,
-#         related_name='confirmed_payments',
-#         verbose_name="Tasdiqlovchi admin",
-#         help_text="To'lovni kim tasdiqlagan"
-#     )
-#     confirmed_date = models.DateTimeField(
-#         null=True, blank=True, 
-#         verbose_name="Tasdiqlangan sana", 
-#         help_text="To'lov qachon tasdiqlangan")
-    
-#     rejection_reason = models.TextField(
-#         null=True, blank=True, 
-#         verbose_name="Rad etish sababi", 
-#         help_text="Agar to'lov rad etilgan bo'lsa, sababi")
-
-#     # Deprecated field - backward compatibility uchun
-#     is_confirmed = models.BooleanField(
-#         default=False, 
-#         verbose_name="Tasdiqlangan (eski)", 
-#         help_text="Bu maydon status maydoni bilan almashtirildi")
-
-#     def save(self, *args, **kwargs):
-#         # Status va is_confirmed ni sinxronlash
-#         if self.status == 'CONFIRMED':
-#             self.is_confirmed = True
-#             if not self.confirmed_date:
-#                 self.confirmed_date = timezone.now()
-#         else:
-#             self.is_confirmed = False
-#         super().save(*args, **kwargs)
-
-#     def __str__(self):
-#         return f"{self.user.full_name} - {self.konkurs.title} ({self.amount}) [{self.get_status_display()}]"
-
-#     class Meta:
-#         verbose_name = "Konkurs to'lovi"
-#         verbose_name_plural = "Konkurs to'lovlari"
-#         ordering = ['-payment_date']
-#         indexes = [
-#             models.Index(fields=['status', 'payment_date']),
-#             models.Index(fields=['user', 'konkurs']),
-#         ]
 
 class CourseParticipant(models.Model):
     user = models.ForeignKey(
@@ -466,51 +323,6 @@ class CourseParticipant(models.Model):
         unique_together = ('user', 'course')
         verbose_name = "Kurs ishtirokchisi"
         verbose_name_plural = "Kurs ishtirokchilari"
-
-class KonkursParticipant(models.Model):
-    user = models.ForeignKey(
-        TelegramUser, on_delete=models.CASCADE,
-        related_name='konkurs_participants_users',
-        verbose_name="Foydalanuvchi",
-        help_text="Konkurs ishtirokchisi foydalanuvchisi")
-    konkurs = models.ForeignKey(
-        Konkurslar, on_delete=models.CASCADE,
-        related_name='konkurs_participants',
-        verbose_name="Konkurs",
-        help_text="Konkurs ishtirokchisi konkursi")
-    payment = models.OneToOneField(
-        Payments, on_delete=models.CASCADE,
-        related_name='konkurs_participant_payments',
-        verbose_name="To'lov",
-        help_text="Konkurs ishtirokchisi to'lovi")
-    joined_date = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Qo'shilgan sana",
-        help_text="Konkurs ishtirokchisi qo'shilgan sana")
-    private_channel_invited = models.BooleanField(
-        default=False,
-        verbose_name="Yopiq kanalga taklif qilingan",
-        help_text="Konkurs ishtirokchisi yopiq kanalga taklif qilinganmi")
-    referral_link = models.CharField(
-        max_length=255, null=True, blank=True,
-        verbose_name="Referal havola",
-        help_text="Konkurs ishtirokchisi uchun referal havola"
-        )
-    
-    def save(self, *args, **kwargs):
-        # Referal link yaratish
-        if not self.referral_link:
-            self.referral_link = self.user.get_referral_link()
-        super().save(*args, **kwargs)
-    
-    def __str__(self):
-        return f"{self.user.full_name} - {self.konkurs.title}"
-    
-    class Meta:
-        unique_together = ('user', 'konkurs')
-        verbose_name = "Konkurs ishtirokchisi"
-        verbose_name_plural = "Konkurs ishtirokchilari"
-        ordering = ['-joined_date']
 
 
 class MandatoryChannel(models.Model):
@@ -547,10 +359,10 @@ class MandatoryChannel(models.Model):
 
 
 class PrivateChannel(models.Model):
-    konkurs = models.ForeignKey(
-        Konkurslar, on_delete=models.CASCADE, 
+    kurslar = models.ForeignKey(
+        Kurslar, on_delete=models.CASCADE, 
         related_name='private_channels',
-        verbose_name="Konkurs",
+        verbose_name="kurslar",
         help_text="Bu yopiq kanal qaysi konkurs uchun")
     name = models.CharField(max_length=255, verbose_name="Kanal nomi")
     telegram_id = models.CharField(
@@ -569,7 +381,7 @@ class PrivateChannel(models.Model):
     class Meta:
         verbose_name = "Yopiq kanal"
         verbose_name_plural = "Yopiq kanallar"
-        ordering = ['konkurs', 'name']
+        ordering = ['name', ]
 
 
 
@@ -629,3 +441,4 @@ class Notification(models.Model):
             models.Index(fields=['recipient', 'is_read']),
             models.Index(fields=['notification_type', 'created_at']),
         ]
+
