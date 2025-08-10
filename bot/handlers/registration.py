@@ -11,7 +11,7 @@ from bot.buttons.inline.professions import get_profession_buttons
 from bot.buttons.default.gender import get_gender_keyboard
 from bot.utils.formatters import format_phone_number
 from bot.utils.helpers import get_region_code_by_name, get_gender_code_by_name
-from bot.services.user import create_user
+from bot.services.user import create_user, get_user_by_referral_code
 from bot.services.subscribe import check_channels_after_registration
 
 router = Router()
@@ -130,6 +130,22 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
         return
     
     data = await state.get_data()
+    
+    # Referral ma'lumotlarini olish
+    referral_code = data.get('referral_code', None)
+    invited_by_user = None
+    
+    # Agar referral code mavjud bo'lsa, taklif qiluvchi foydalanuvchini topamiz
+    if referral_code:
+        try:
+            invited_by_user = await get_user_by_referral_code(referral_code)
+            if invited_by_user:
+                logging.info(f"Found referrer: {invited_by_user.full_name} for code: {referral_code}")
+            else:
+                logging.warning(f"Referrer not found for code: {referral_code}")
+        except Exception as e:
+            logging.error(f"Error finding referrer: {e}")
+    
     try:
         user = await create_user(
             telegram_id=str(message.from_user.id),
@@ -139,7 +155,9 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
             profession=data['profession'],
             region=get_region_code_by_name(data['region']),
             gender=gender_code,
-            level="1-bosqich",
+            referral_code=None,  # Bu avtomatik yaratiladi
+            invited_by=invited_by_user,  # To'g'ri parametr nomi
+            level="0-bosqich",
             age=data.get('age')
         )
         
@@ -147,12 +165,26 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
             logging.error(f"Failed to create user for telegram_id: {message.from_user.id}")
             await message.answer(Messages.system_error.value)
             return
+        
+        # Referral xabari
+        referral_message = ""
+        if invited_by_user:
+            referral_message = f"\n\n🎉 Siz {invited_by_user.full_name} tomonidan taklif qilindingiz!"
             
-        await message.answer(Messages.welcome_message_for_registration.value)
+        await message.answer(
+            Messages.welcome_message_for_registration.value + referral_message
+        )
+        await message.answer(
+            text="✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
+        
+        
+        
         await check_channels_after_registration(message, bot)
         
     except Exception as e:
-        logging.error(f"Registration error: {e}")
+        logging.error(f"Registration error: {e}", exc_info=True)
         await message.answer(Messages.system_error.value)
     finally:
         await state.clear()

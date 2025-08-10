@@ -26,21 +26,57 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-2)h%6&fi_(_3*uzd^gkep9)7ywo%c3y+cr-k2*g3dv=b0y@e#l'
 TELEGRAM_BOT_USERNAME = 'BaxtXaritasiBot'
-
+TELEGRAM_BOT_TOKEN = "7592929768:AAHlLmE-DAssUMR-V7MZTG0vKFSjmGI1F68"
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = ["*"]  # Allow all hosts for development; change in production
 
+
+# Logging sozlamalari
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'telegram_notifications.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'myapp.signals': {  # O'z app nomingizni yozing
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
+
+# Cache sozlamalari (Redis yoki Memcached)
+
+
 # `CORS` settings
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['https://0e4fb32ef016.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://be8dfd716890.ngrok-free.app']
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = '0e4fb32ef016.ngrok-free.app'
+CSRF_COOKIE_DOMAIN = 'be8dfd716890.ngrok-free.app'
 CORS_ORIGIN_WHITELIST = (
-    'https://0e4fb32ef016.ngrok-free.app'
+    'https://be8dfd716890.ngrok-free.app'
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ########### End Cors 
@@ -64,6 +100,7 @@ INSTALLED_APPS = [
 
     ### Third-party apps
     'django_extensions',
+    
 
 ]
 

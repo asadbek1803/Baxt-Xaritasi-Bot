@@ -8,4 +8,6 @@ asgiref==3.8.1
 async-timeout==5.0.1
 python-dotenv==1.0.0
 pillow==10.0.0
-django-extensions===3.2.1 
+django-extensions===3.2.1 # Django kengaytmalari
+redis>=4.5.0  # agar Redis ishlatilsa
+django-redis>=5.2.0  # agar Redis cache ishlatilsa

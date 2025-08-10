@@ -53,6 +53,7 @@ AGE_CHOICES = [
     ]
 
 LEVEL_CHOICES = [
+    ('level_0', "0-bosqich"),
     ('level_1', "1-bosqich"),
     ('level_2', "2-bosqich"),
     ('level_3', "3-bosqich"),

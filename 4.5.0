@@ -1,0 +1,6 @@
+Collecting redis
+  Downloading redis-6.4.0-py3-none-any.whl.metadata (10 kB)
+Downloading redis-6.4.0-py3-none-any.whl (279 kB)
+   -------------------------------------- 279.8/279.8 kB 751.0 kB/s eta 0:00:00
+Installing collected packages: redis
+Successfully installed redis-6.4.0

@@ -8,7 +8,7 @@ def get_menu_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="📞 Aloqa"),
-                KeyboardButton(text="⚡ Bosqichlar"),
+                KeyboardButton(text="⚡️ Bosqichlar"),
             ],
             [
                 KeyboardButton(text="📑 Loyiha haqida"),

@@ -51,7 +51,7 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
         user_level = await get_user_level(telegram_id=user_id)
 
         # Agar foydalanuvchi 1-bosqich bo'lsa
-        if user_level == "1-bosqich":
+        if user_level == "0-bosqich":
             if await get_user_buy_course(telegram_id=user_id):
                 return await callback.message.answer(
                     text=Messages.welcome_message.value.format(full_name=user.full_name),

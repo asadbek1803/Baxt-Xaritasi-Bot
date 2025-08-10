@@ -21,6 +21,7 @@ def get_user_referrer_info(invited_by):
 
 # Level mapping dictionary
 LEVEL_MAPPING = {
+    "0-bosqich": "level_0",
     "1-bosqich": "level_1",
     "2-bosqich": "level_2", 
     "3-bosqich": "level_3",
@@ -41,7 +42,7 @@ async def my_profile_handler(message: types.Message, bot: Bot):
     print(f"User: {user_info.full_name}, Level: {user_info.level}")
     
     # Foydalanuvchi levelini tekshirish
-    is_low_level = user_info.level in ["1-bosqich", "level_1", "2-bosqich", "level_2"]
+    is_low_level = user_info.level in ["0-bosqich","level_0","1-bosqich", "level_1"]
     
     try:
         # Asosiy profil ma'lumotlari (barcha levellar uchun)

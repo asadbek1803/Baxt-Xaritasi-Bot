@@ -2,6 +2,7 @@ from asgiref.sync import sync_to_async
 from django.db import close_old_connections
 from bot.models import TelegramUser
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +13,11 @@ async def create_user(
     age: str,
     telegram_username: str,
     profession: str,
-    region: str,
-    level: str,
-    gender: str
+    referral_code: str = None,  # refferal_code o'rniga referral_code
+    invited_by: TelegramUser = None,  # refferal_user o'rniga invited_by
+    region: str = None,
+    level: str = "0-bosqich",
+    gender: str = None
 ) -> TelegramUser:
     """
     Creates a new Telegram user with proper async handling and connection management
@@ -35,6 +38,7 @@ async def create_user(
                 age=age,
                 telegram_username=telegram_username,
                 profession=profession,
+                invited_by=invited_by,
                 region=region,
                 level=level,
                 gender=gender
@@ -53,6 +57,7 @@ async def create_user(
             age=age,
             telegram_username=telegram_username,
             profession=profession,
+            invited_by=invited_by,
             region=region,
             level=level,
             gender=gender
@@ -79,30 +84,68 @@ def _get_user_sync(telegram_id: str):
         logger.error(f"Failed to get user {telegram_id}: {str(e)}", exc_info=True)
         return None
 
+
 def _create_user_sync(**kwargs):
     """Synchronous helper function for user creation"""
     try:
+        # Generate unique referral code for new user
+        if 'referral_code' not in kwargs or not kwargs['referral_code']:
+            kwargs['referral_code'] = str(uuid.uuid4())[:8]
+        
+        # Create user with all provided data
         user = TelegramUser.objects.create(
             is_confirmed=False,
             **kwargs
         )
+        
+        # If user was invited by someone, increment referrer's count
+        if user.invited_by:
+            user.invited_by.referral_count += 1
+            user.invited_by.save()
+        
         return user
     except Exception as e:
         logger.error(f"Sync user creation failed: {str(e)}", exc_info=True)
         return None
 
-async def update_user(chat_id: str, **kwargs) -> bool:
+async def update_user(
+    chat_id: str,
+    phone_number: str = None,
+    full_name: str = None,
+    age: str = None,
+    telegram_username: str = None,
+    profession: str = None,
+    region: str = None,
+    level: str = None,
+    gender: str = None,
+    is_confirmed: bool = None,
+    invited_by: TelegramUser = None,  # Yangi maydon qo'shildi
+    referral_code: str = None  # Yangi maydon qo'shildi
+) -> bool:
     """
     Updates user data with proper connection handling and validation
     """
     allowed_fields = {
         "phone_number", "full_name", 
         "telegram_username", "age", "region",
-        "profession", "is_confirmed", "gender", "level"
+        "profession", "is_confirmed", "gender", "level",
+        "invited_by", "referral_code"  # Yangi maydonlar qo'shildi
     }
     
     # Filter and validate update data
-    update_data = {k: v for k, v in kwargs.items() if k in allowed_fields and v is not None}
+    update_data = {k: v for k, v in {
+        "phone_number": phone_number,
+        "full_name": full_name,
+        "telegram_username": telegram_username,
+        "age": age,
+        "region": region,
+        "profession": profession,
+        "is_confirmed": is_confirmed,
+        "gender": gender,
+        "level": level,
+        "invited_by": invited_by,
+        "referral_code": referral_code
+    }.items() if k in allowed_fields and v is not None}
     
     if not update_data:
         logger.warning(f"No valid fields to update for user {chat_id}")
@@ -144,3 +187,25 @@ async def get_user(telegram_id: str) -> TelegramUser:
         return None
     finally:
         await sync_to_async(close_old_connections)()
+
+async def get_user_by_referral_code(referral_code: str) -> TelegramUser:
+    """
+    Get user by referral code with proper async handling
+    """
+    try:
+        await sync_to_async(close_old_connections)()
+        user = await sync_to_async(_get_user_by_referral_code_sync)(referral_code)
+        return user
+    except Exception as e:
+        logger.error(f"Failed to get user by referral code {referral_code}: {str(e)}", exc_info=True)
+        return None
+    finally:
+        await sync_to_async(close_old_connections)()
+
+def _get_user_by_referral_code_sync(referral_code: str):
+    """Synchronous helper function to get user by referral code"""
+    try:
+        return TelegramUser.objects.filter(referral_code=referral_code).first()
+    except Exception as e:
+        logger.error(f"Failed to get user by referral code {referral_code}: {str(e)}", exc_info=True)
+        return None

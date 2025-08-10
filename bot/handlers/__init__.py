@@ -5,6 +5,8 @@ from .check_subscribe import router as subscription_router
 from .back import router as back_router
 from .my_profile import router as my_profile_router
 from .buy_course import router as buy_course
+from .stages import router as stages_router
+from .my_team import router as my_team_router
 
 
 
@@ -17,4 +19,7 @@ router.include_router(subscription_router)
 router.include_router(back_router) 
 router.include_router(buy_course)
 router.include_router(my_profile_router)
+router.include_router(stages_router)
+router.include_router(my_team_router)
+
 

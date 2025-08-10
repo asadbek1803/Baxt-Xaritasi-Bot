@@ -10,11 +10,7 @@ from .constants import (
     LEVEL_CHOICES, 
     STATUS_CHOICES,
     PAYMENT_TYPES
-
-
-    
-    )
-
+)
 class TelegramUser(models.Model):
     telegram_id = models.CharField(
         max_length=50, unique=True, 
@@ -34,7 +30,8 @@ class TelegramUser(models.Model):
     level = models.CharField(
         max_length=20, help_text="Foydalanuvchi darajasi",
         choices=LEVEL_CHOICES, 
-        verbose_name="Foydalanuvchi darajasi"
+        verbose_name="Foydalanuvchi darajasi",
+        default="0-bosqich"  # Default qiymat qo'shildi
     )
 
     phone_number = models.CharField(
@@ -112,14 +109,99 @@ class TelegramUser(models.Model):
     
     is_blocked = models.BooleanField(default=False, verbose_name="Bloklangan")
    
+    def save(self, *args, **kwargs):
+        import uuid
+        # Agar referral_code yo'q bo'lsa, avtomatik yaratamiz
+        if not self.referral_code:
+            self.referral_code = str(uuid.uuid4())[:8]
+        super().save(*args, **kwargs)
+    def get_direct_referrals(self):
+        """To'g'ridan-to'g'ri referallarni olish"""
+        return self.referrals.filter(is_confirmed=True)
+    
+    def get_total_referrals_count(self):
+        """Jami referallar sonini olish (barcha darajalar)"""
+        # 1-daraja
+        level_1 = self.referrals.count()
+        
+        # 2-daraja
+        level_2 = TelegramUser.objects.filter(
+            invited_by__invited_by=self
+        ).count()
+        
+        # 3-daraja
+        level_3 = TelegramUser.objects.filter(
+            invited_by__invited_by__invited_by=self
+        ).count()
+        
+        return level_1 + level_2 + level_3
+    
+    def get_referral_earnings(self):
+        """Referal orqali topilgan daromad (taxminiy)"""
+        # Har bir referal uchun 5000 so'm bonus
+        return self.referrals.filter(is_confirmed=True).count() * 5000
+    
+    def get_referral_status(self):
+        """Referal statusini aniqlash"""
+        count = self.referrals.count()
+        if count >= 50:
+            return "🥇 Oltin referer"
+        elif count >= 20:
+            return "🥈 Kumush referer" 
+        elif count >= 10:
+            return "🥉 Bronza referer"
+        elif count >= 5:
+            return "🔰 Faol referer"
+        else:
+            return "👶 Yangi referer"
+    
+    def can_get_bonus(self):
+        """Bonus olish imkoniyati borligini tekshirish"""
+        # Kamida 5 ta tasdiqlangan referal kerak
+        return self.referrals.filter(is_confirmed=True).count() >= 5
+    
+    def get_this_month_referrals(self):
+        """Bu oy qo'shilgan referallar"""
+        from django.utils import timezone
+        start_of_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return self.referrals.filter(
+            registration_date__gte=start_of_month
+        ).count()
+    
+    def update_referral_count(self):
+        """Referal sonini yangilash"""
+        self.referral_count = self.referrals.count()
+        self.save(update_fields=['referral_count'])
+    
+    @property
+    def referral_tree_depth(self):
+        """Referal daraxti chuqurligi"""
+        max_depth = 0
+        
+        def check_depth(user, current_depth=0):
+            nonlocal max_depth
+            max_depth = max(max_depth, current_depth)
+            
+            for referral in user.referrals.all():
+                check_depth(referral, current_depth + 1)
+        
+        check_depth(self)
+        return max_depth
+    
+    def get_referral_conversion_rate(self):
+        """Referal konversiya darajasi (tasdiqlangan/jami)"""
+        total = self.referrals.count()
+        if total == 0:
+            return 0
+        
+        confirmed = self.referrals.filter(is_confirmed=True).count()
+        return round((confirmed / total) * 100, 1)
 
     def get_referral_link(self):
         if not self.referral_code:
-            import uuid
-            from django.conf import settings
             self.referral_code = str(uuid.uuid4())[:8]
             self.save()
-        bot_username = "testBot"
+        bot_username = "testBot"  # Bu yerga o'zingizning bot username-ini yozing
         return f"https://t.me/{bot_username}?start={self.referral_code}"
     
     def __str__(self):
@@ -254,12 +336,24 @@ class Payments(models.Model):
         self.status = 'CONFIRMED'
         self.is_confirmed = True
         self.confirmed_date = timezone.now()
-        self.user.level = "2-bosqich"
         
+        
+        # Foydalanuvchi darajasini yangilash
+        levels = list(LEVEL_CHOICES)
+        # Find index by value (label), fallback to key if needed
+        try:
+            current_level_index = [label for key, label in levels].index(self.user.level)
+        except ValueError:
+            # If not found by label, try by key
+            current_level_index = [key for key, label in levels].index(self.user.level)
+        if current_level_index < len(levels) - 1:
+            new_level = levels[current_level_index + 1][0]  # get the key for the next level
+            self.user.level = new_level
+
         self.user.save()
         self.save()
         
-        
+
         # Kurs to'lovi bo'lsa
         if self.payment_type == 'COURSE' and self.course:
             CourseParticipant.objects.get_or_create(
@@ -272,8 +366,45 @@ class Payments(models.Model):
                 referrer = self.user.invited_by
                 referrer.referral_count += 1
                 referrer.save()
+            Notification.objects.create(
+                recipient=self.user,
+                sender=None,  # Admin yoki tizim xabari
+                notification_type='PAYMENT_CONFIRMED',
+                title="To'lov tasdiqlandi",
+                message=f"Sizning to'lovingiz {self.amount} so'm miqdorida tasdiqlandi. Kursga qo'shildingiz!",
+                extra_data={
+                    'course_id': self.course.id if self.course else None,
+                    'payment_id': self.id
+                }
+            )
+    
+    def reject_payment(self, reason):
+        self.status = 'REJECTED'
+        self.is_confirmed = False
+        self.rejection_reason = reason
+        self.save()
         
-       
+        Notification.objects.create(
+            recipient=self.user,
+            sender=None,  # Admin yoki tizim xabari
+            notification_type='PAYMENT_REJECTED',
+            title="To'lov rad etildi",
+            message=f"Sizning to'lovingiz {self.amount} so'm miqdorida rad etildi. Sababi: {reason}",
+            extra_data={
+                'payment_id': self.id
+            }
+        )
+    def clean(self):
+        """
+        Model validatsiyasi
+        """
+        if self.status == 'CONFIRMED' and not self.confirmed_by:
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Tasdiqlangan to'lov uchun admin ko'rsatilishi kerak")
+    
+   
+        
+    
     def __str__(self):
         if self.course:
             return f"{self.user.full_name} - {self.course.name} ({self.amount}) [{self.get_status_display()}]"

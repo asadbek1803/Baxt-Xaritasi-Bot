@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.enums import ContentType
 from django.conf import settings
-
+from aiogram.types import ReplyKeyboardRemove
 from bot.models import Payments, Kurslar, TelegramUser
 from bot.selectors import get_kurs_details
 from bot.constants import Messages
@@ -62,8 +62,9 @@ async def process_payment(message: types.Message, state: FSMContext, bot: Bot):
         payment_screenshot=screenshot_path
     )
 
-    await message.answer("✅ To‘lov qabul qilindi! Adminlar tekshirgach, sizga xabar beramiz.")
+    await message.answer("✅ To‘lov qabul qilindi! Adminlar tekshirgach, sizga xabar beramiz.", reply_markup=ReplyKeyboardRemove())
     await state.clear()
+
 
 
 # Screenshot saqlash funksiyasi

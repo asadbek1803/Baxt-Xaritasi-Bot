@@ -1,0 +1,10 @@
+Collecting django-redis
+  Downloading django_redis-6.0.0-py3-none-any.whl.metadata (32 kB)
+Requirement already satisfied: Django>=4.2 in c:\users\asadb\onedrive\desktop\baxt xaritasi bot\env\lib\site-packages (from django-redis) (5.2.2)
+Requirement already satisfied: redis>=4.0.2 in c:\users\asadb\onedrive\desktop\baxt xaritasi bot\env\lib\site-packages (from django-redis) (6.4.0)
+Requirement already satisfied: asgiref>=3.8.1 in c:\users\asadb\onedrive\desktop\baxt xaritasi bot\env\lib\site-packages (from Django>=4.2->django-redis) (3.8.1)
+Requirement already satisfied: sqlparse>=0.3.1 in c:\users\asadb\onedrive\desktop\baxt xaritasi bot\env\lib\site-packages (from Django>=4.2->django-redis) (0.5.3)
+Requirement already satisfied: tzdata in c:\users\asadb\onedrive\desktop\baxt xaritasi bot\env\lib\site-packages (from Django>=4.2->django-redis) (2025.2)
+Downloading django_redis-6.0.0-py3-none-any.whl (33 kB)
+Installing collected packages: django-redis
+Successfully installed django-redis-6.0.0
