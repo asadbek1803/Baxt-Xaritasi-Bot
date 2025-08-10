@@ -54,7 +54,7 @@ def get_stages_keyboard(user_level: str, purchased_course_levels: set) -> Inline
                 callback_data=callback_data
             )
         ])
-
+    
     keyboard_buttons.append([
         InlineKeyboardButton(
             text="◀️ Orqaga",
@@ -159,6 +159,12 @@ Kursni sotib olishni xohlaysizmi?
                 ],
                 [
                     InlineKeyboardButton(
+                        text="📢 Referral yaratish",
+                        callback_data=f"create_referral_{course.id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
                         text="◀️ Orqaga",
                         callback_data="back_to_stages"
                     )
@@ -199,6 +205,12 @@ Kursni sotib olishni xohlaysizmi?
                     InlineKeyboardButton(
                         text="💳 Sotib olish",
                         callback_data=f"buy_course_{course.id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="📢 Referral yaratish",
+                        callback_data=f"create_referral_{course.id}"
                     )
                 ],
                 [

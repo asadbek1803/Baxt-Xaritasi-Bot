@@ -4,7 +4,8 @@ from .models import (
     TelegramUser,
     MandatoryChannel,
     Payments,
-    Kurslar
+    Kurslar,
+    ReferralPayment
 )
 from datetime import datetime
 
@@ -505,3 +506,67 @@ def search_referrals(user_id: str, search_query: str, limit: int = 10):
             Q(telegram_username__icontains=search_query)
         ).order_by('-registration_date')[:limit]
     )
+
+
+
+@sync_to_async
+def create_referral_payment_request(user_id: str, referrer_id: str, amount: float):
+    """Referral to'lov so'rovini yaratish"""
+    user = TelegramUser.objects.filter(telegram_id=user_id).first()
+    referrer = TelegramUser.objects.filter(telegram_id=referrer_id).first()
+    
+    if not user or not referrer:
+        return None
+    
+    payment = ReferralPayment(
+        user=user,
+        referrer=referrer,
+        amount=amount,
+        payment_type='REFERRAL_BONUS',
+        status='PENDING'
+    )
+    payment.save()
+    return payment
+
+@sync_to_async
+def get_pending_referral_payments(referrer_id: str):
+    """Tasdiqlanishi kerak bo'lgan referral to'lovlarni olish"""
+    return list(ReferralPayment.objects.filter(
+        referrer__telegram_id=referrer_id,
+        payment_type='REFERRAL_BONUS',
+        status='PENDING'
+    ))
+
+@sync_to_async
+def confirm_referral_payment(payment_id: str, admin_user_id: str):
+    """Referral to'lovni tasdiqlash"""
+    payment = ReferralPayment.objects.filter(id=payment_id).first()
+    admin_user = TelegramUser.objects.filter(telegram_id=admin_user_id).first()
+    
+    if payment and admin_user:
+        payment.status = 'CONFIRMED'
+        payment.confirmed_by = admin_user
+        payment.confirmed_date = datetime.now()
+        payment.save()
+        
+        # Referral kod yaratish
+        if not payment.user.referral_code:
+            payment.user.referral_code = str(uuid.uuid4())[:8]
+            payment.user.save()
+        
+        return True
+    return False
+
+@sync_to_async
+def reject_referral_payment(payment_id: str, admin_user_id: str):
+    """Referral to'lovni rad etish"""
+    payment = ReferralPayment.objects.filter(id=payment_id).first()
+    admin_user = TelegramUser.objects.filter(telegram_id=admin_user_id).first()
+    
+    if payment and admin_user:
+        payment.status = 'REJECTED'
+        payment.confirmed_by = admin_user
+        payment.confirmed_date = datetime.now()
+        payment.save()
+        return True
+    return False

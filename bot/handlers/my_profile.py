@@ -133,7 +133,12 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                         types.InlineKeyboardButton(
                             text="🛒 Kurs sotib olish",
                             callback_data=f"buy_course_{course.id}"
+                        ),
+                        types.InlineKeyboardButton(
+                            text="📢 Referral yaratish",
+                            callback_data=f"create_referral_{course.id}"
                         )
+
                     )
             except Exception as e:
                 print(f"Error getting course for button: {e}")
@@ -168,8 +173,8 @@ async def copy_referral_link(callback: types.CallbackQuery):
             return
         
         # Level tekshirish
-        if user_info.level in ["1-bosqich", "level_1", "2-bosqich", "level_2"]:
-            await callback.answer("🔒 Bu funksiya faqat 3-bosqichdan boshlab mavjud!", show_alert=True)
+        if user_info.is_confirmed == False:
+            await callback.answer("🔒 Bu funksiya faqat refferal sotib olgan foydalanuvchilar uchun!", show_alert=True)
             return
         
         referral_link = await sync_to_async(user_info.get_referral_link)()
@@ -199,8 +204,8 @@ async def show_user_stats(callback: types.CallbackQuery):
             return
         
         # Level tekshirish
-        if user_info.level in ["1-bosqich", "level_1", "2-bosqich", "level_2"]:
-            await callback.answer("🔒 Bu funksiya faqat 3-bosqichdan boshlab mavjud!", show_alert=True)
+        if user_info.is_confirmed == False:
+            await callback.answer("🔒 Bu funksiya faqat refferal sotib olgan foydalanuvchilar uchun!", show_alert=True)
             return
         
         # Referral count-ni olish

@@ -45,7 +45,18 @@ class TelegramUser(models.Model):
         help_text="Foydalanuvchining Telegram foydalanuvchi nomi",
         verbose_name="Telegram foydalanuvchi nomi"
         )
-    
+    # Plastik karta ma'lumotlari
+    card_number = models.CharField(
+        max_length=20, blank=True, null=True,
+        help_text="Foydalanuvchining plastik karta raqami",
+        verbose_name="Plastik karta raqami"
+    )
+    card_holder_full_name = models.CharField(
+        max_length=200, blank=True, null=True,
+        help_text="Foydalanuvchining karta egasining to'liq ismi",
+        verbose_name="Karta egasining to'liq ismi"
+    )
+
     # Joylashuv va shaxsiy ma'lumotlar
     region = models.CharField(
         max_length=50, choices=REGIONS,
@@ -217,6 +228,48 @@ class TelegramUser(models.Model):
             models.Index(fields=['referral_code']),
             models.Index(fields=['is_confirmed', 'registration_date']),
         ]
+
+class ReferralPayment(models.Model):
+    user = models.ForeignKey(
+        TelegramUser, 
+        on_delete=models.CASCADE,
+        related_name='referral_payments_made',
+        verbose_name="To'lovchi"
+    )
+    referrer = models.ForeignKey(
+        TelegramUser,
+        on_delete=models.CASCADE,
+        related_name='referral_payments_received',
+        verbose_name="Referral egasi"
+    )
+    amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name="To'lov miqdori"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDING',
+        verbose_name="Holati"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    confirmed_by = models.ForeignKey(
+        TelegramUser,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='confirmed_referral_payments',
+        verbose_name="Tasdiqlovchi"
+    )
+
+    def __str__(self):
+        return f"{self.user.full_name} → {self.referrer.full_name} ({self.amount})"
+
+    class Meta:
+        verbose_name = "Referral to'lovi"
+        verbose_name_plural = "Referral to'lovlari"
+
 
 class Kurslar(models.Model):
     name = models.CharField(max_length=500, 
