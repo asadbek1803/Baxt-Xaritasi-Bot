@@ -2,7 +2,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup, 
 from aiogram import types
 from asgiref.sync import sync_to_async
 from aiogram import Router, Bot, F
-from bot.selectors import fetch_user, get_all_active_courses_list, get_course_by_user_level
+from bot.selectors import (
+    fetch_user, 
+    get_all_active_courses_list, 
+    get_course_by_user_level,
+    get_user_referral_link_async  # Import the new async function
+)
 
 from bot.models import TelegramUser
 
@@ -19,6 +24,9 @@ def get_user_referrer_info(invited_by):
         return referrer.full_name
     return "Yo'q"
 
+# Remove the old sync function since we now import from selectors
+# def get_user_referral_link(user_info): <-- DELETE THIS
+
 # Level mapping dictionary
 LEVEL_MAPPING = {
     "0-bosqich": "level_0",
@@ -27,6 +35,8 @@ LEVEL_MAPPING = {
     "3-bosqich": "level_3",
     "4-bosqich": "level_4",
     "5-bosqich": "level_5",
+    "6-bosqich": "level_6",
+    "7-bosqich": "level_7",
 }
 
 @router.message(F.text == "👤 Mening hisobim")
@@ -39,7 +49,7 @@ async def my_profile_handler(message: types.Message, bot: Bot):
         await message.answer("❌ Sizning profilingiz topilmadi. Iltimos, avval ro'yxatdan o'ting.")
         return
 
-    print(f"User: {user_info.full_name}, Level: {user_info.level}")
+    print(f"User: {user_info.full_name}, Level: {user_info.level}, is_confirmed: {user_info.is_confirmed}")
     
     # Foydalanuvchi levelini tekshirish
     is_low_level = user_info.level in ["0-bosqich","level_0","1-bosqich", "level_1"]
@@ -81,37 +91,34 @@ async def my_profile_handler(message: types.Message, bot: Bot):
             f"├ Level: <b>{user_info.level}</b>\n\n"
         )
         
-        # Referal tizimi (faqat 3+ levellar uchun)
-        if not is_low_level:
-            profile_info += (
-                f"👥 <b>Referal tizimi</b>\n"
-                f"├ Taklif qilgan: <b>{referrer_info}</b>\n"
-                f"├ Taklif qilganlar soni: <b>{referral_count} ta</b>\n"
-            )
-            
-            # Referal link olish
+        # Referal tizimi (barcha levellar uchun ko'rsatamiz)
+        profile_info += (
+            f"👥 <b>Referal tizimi</b>\n"
+            f"├ Taklif qilgan: <b>{referrer_info}</b>\n"
+            f"├ Taklif qilganlar soni: <b>{referral_count} ta</b>\n"
+        )
+        
+        # Referal link olish (faqat tasdiqlangan userlar uchun)
+        if user_info.is_confirmed:
             try:
-                referral_link = await sync_to_async(user_info.get_referral_link)()
+                referral_link = await get_user_referral_link_async(user_info)  # Use async function
                 profile_info += f"└ Referal link: <code>{referral_link}</code>\n\n"
             except Exception as e:
                 print(f"Error getting referral link: {e}")
                 profile_info += "└ Referal link: Xatolik\n\n"
         else:
-            # Past levellar uchun referal tizimi haqida ma'lumot
-            profile_info += (
-                f"👥 <b>Referal tizimi</b>\n"
-                f"└ 🔒 3-bosqichdan boshlab mavjud bo'ladi\n\n"
-            )
+            profile_info += "└ Referal link: 🔒 Tasdiqlanganidan keyin mavjud bo'ladi\n\n"
         
         # Tasdiqlash holati
         status_text = "✅ Tasdiqlangan admin tomonidan" if user_info.is_confirmed else "⏳ Tasdiqlanmagan"
         profile_info += f"🛡 <b>Status</b>\n└ {status_text}"
 
-        # Keyboard yaratish (levelga qarab)
+        # Keyboard yaratish (levelga va tasdiqlash holatiga qarab)
         builder = InlineKeyboardBuilder()
         
-        if not is_low_level:
-            # Yuqori levellar uchun barcha tugmalar
+        # is_confirmed ga qarab tugmalarni ko'rsatish
+        if user_info.is_confirmed:
+            # Tasdiqlangan userlar uchun statistika va referal link tugmalari
             builder.row(
                 types.InlineKeyboardButton(
                     text="📊 Statistikani ko'rish",
@@ -124,8 +131,14 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                     callback_data=f"copy_ref_{user_info.telegram_id}"
                 )
             )
+            builder.row(
+            types.InlineKeyboardButton(
+                text="💳 Plastik karta ma'lumotlari",
+                callback_data=f"card_info_{user_info.telegram_id}"
+            )
+        )
         else:
-            # Past levellar uchun kurs sotib olish tugmasi
+            # Tasdiqlanmagan userlar uchun kurs sotib olish va referal yaratish tugmalari
             try:
                 course = await get_course_by_user_level(user_info.level)
                 if course:
@@ -133,15 +146,17 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                         types.InlineKeyboardButton(
                             text="🛒 Kurs sotib olish",
                             callback_data=f"buy_course_{course.id}"
-                        ),
+                        )
+                    )
+                    builder.row(
                         types.InlineKeyboardButton(
                             text="📢 Referral yaratish",
                             callback_data=f"create_referral_{course.id}"
                         )
-
                     )
+        
             except Exception as e:
-                print(f"Error getting course for button: {e}")
+                print(f"Error getting course for buttons: {e}")
 
         # Profil ma'lumotlarini yuborish
         if builder.export():
@@ -163,7 +178,7 @@ async def my_profile_handler(message: types.Message, bot: Bot):
 
 @router.callback_query(F.data.startswith("copy_ref_"))
 async def copy_referral_link(callback: types.CallbackQuery):
-    """Referal linkni nusxalash - faqat yuqori levellar uchun"""
+    """Referal linkni nusxalash - faqat tasdiqlangan userlar uchun"""
     try:
         user_id = callback.data.split("_")[2]
         user_info = await fetch_user(user_id)
@@ -172,12 +187,12 @@ async def copy_referral_link(callback: types.CallbackQuery):
             await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)
             return
         
-        # Level tekshirish
-        if user_info.is_confirmed == False:
-            await callback.answer("🔒 Bu funksiya faqat refferal sotib olgan foydalanuvchilar uchun!", show_alert=True)
+        # Tasdiqlash tekshirish
+        if not user_info.is_confirmed:
+            await callback.answer("🔒 Bu funksiya faqat tasdiqlangan foydalanuvchilar uchun!", show_alert=True)
             return
         
-        referral_link = await sync_to_async(user_info.get_referral_link)()
+        referral_link = await get_user_referral_link_async(user_info)  # Use async function
         await callback.message.answer(
             f"📋 <b>Referal link</b>\n\n"
             f"Quyidagi linkni nusxalash uchun bosing:\n\n"
@@ -194,7 +209,7 @@ async def copy_referral_link(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("stats_"))
 async def show_user_stats(callback: types.CallbackQuery):
-    """Foydalanuvchi statistikasini ko'rsatish - faqat yuqori levellar uchun"""
+    """Foydalanuvchi statistikasini ko'rsatish - faqat tasdiqlangan userlar uchun"""
     try:
         user_id = callback.data.split("_")[1]
         user_info = await fetch_user(user_id)
@@ -203,9 +218,9 @@ async def show_user_stats(callback: types.CallbackQuery):
             await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)
             return
         
-        # Level tekshirish
-        if user_info.is_confirmed == False:
-            await callback.answer("🔒 Bu funksiya faqat refferal sotib olgan foydalanuvchilar uchun!", show_alert=True)
+        # Tasdiqlash tekshirish
+        if not user_info.is_confirmed:
+            await callback.answer("🔒 Bu funksiya faqat tasdiqlangan foydalanuvchilar uchun!", show_alert=True)
             return
         
         # Referral count-ni olish
@@ -226,7 +241,7 @@ async def show_user_stats(callback: types.CallbackQuery):
         
         # Referal link qo'shish
         try:
-            referral_link = await sync_to_async(user_info.get_referral_link)()
+            referral_link = await get_user_referral_link_async(user_info)  # Use async function
             stats_info += f"🔗 Referal link: <code>{referral_link}</code>"
         except Exception as e:
             print(f"Error getting referral link in stats: {e}")

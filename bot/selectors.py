@@ -8,6 +8,7 @@ from .models import (
     ReferralPayment
 )
 from datetime import datetime
+import uuid
 
 # Level mapping dictionary
 LEVEL_MAPPING = {
@@ -507,8 +508,6 @@ def search_referrals(user_id: str, search_query: str, limit: int = 10):
         ).order_by('-registration_date')[:limit]
     )
 
-
-
 @sync_to_async
 def create_referral_payment_request(user_id: str, referrer_id: str, amount: float):
     """Referral to'lov so'rovini yaratish"""
@@ -570,3 +569,35 @@ def reject_referral_payment(payment_id: str, admin_user_id: str):
         payment.save()
         return True
     return False
+
+# NEW ASYNC FUNCTION FOR REFERRAL LINK
+@sync_to_async
+def get_user_referral_link_async(user_info):
+    """User referral linkini async tarzda olish - DATABASE ACCESS INCLUDED"""
+    try:
+        # Agar user modelida get_referral_link methodi mavjud bo'lsa
+        if hasattr(user_info, 'get_referral_link'):
+            return user_info.get_referral_link()
+        else:
+            # Agar method yo'q bo'lsa, manual link yaratish
+            bot_username = "testBot"  # Botingizning username ini yozing
+            return f"https://t.me/{bot_username}?start={user_info.telegram_id}"
+    except Exception as e:
+        print(f"Error in get_user_referral_link_async: {e}")
+        bot_username = "testBot"  # Botingizning username ini yozing
+        return f"https://t.me/{bot_username}?start={user_info.telegram_id}"
+
+@sync_to_async
+def update_user_card_info(telegram_id, card_number, card_holder_name):
+    """Foydalanuvchi plastik karta ma'lumotlarini yangilash"""
+    try:
+        user = TelegramUser.objects.get(telegram_id=telegram_id)
+        user.card_number = card_number
+        user.card_holder_full_name = card_holder_name
+        user.save(update_fields=['card_number', 'card_holder_full_name'])
+        return True
+    except TelegramUser.DoesNotExist:
+        return False
+    except Exception as e:
+        print(f"Error updating card info: {e}")
+        return False

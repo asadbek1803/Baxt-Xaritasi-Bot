@@ -210,10 +210,18 @@ class TelegramUser(models.Model):
 
     def get_referral_link(self):
         if not self.referral_code:
-            self.referral_code = str(uuid.uuid4())[:8]
+            self.referral_code = self.telegram_id
             self.save()
         bot_username = "testBot"  # Bu yerga o'zingizning bot username-ini yozing
         return f"https://t.me/{bot_username}?start={self.referral_code}"
+    
+    @sync_to_async
+    def aget_referral_code(self):
+        return self.get_referral_code()
+    
+    @sync_to_async 
+    def aget_referral_link(self):
+        return self.get_referral_link()
     
     def __str__(self):
         return f"{self.full_name} ({self.phone_number})"
@@ -236,6 +244,12 @@ class ReferralPayment(models.Model):
         related_name='referral_payments_made',
         verbose_name="To'lovchi"
     )
+    payment_type = models.CharField(
+        max_length=20,
+        choices=PAYMENT_TYPES,
+        default='REFERRAL',
+        verbose_name="To'lov turi"
+    )
     referrer = models.ForeignKey(
         TelegramUser,
         on_delete=models.CASCADE,
@@ -253,6 +267,7 @@ class ReferralPayment(models.Model):
         default='PENDING',
         verbose_name="Holati"
     )
+    screenshot = models.CharField(max_length=500, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     confirmed_by = models.ForeignKey(

@@ -72,11 +72,11 @@ LOGGING = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['https://21debc4f3f65.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://be2d994decd4.ngrok-free.app']
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = '21debc4f3f65.ngrok-free.app'
+CSRF_COOKIE_DOMAIN = 'be2d994decd4.ngrok-free.app'
 CORS_ORIGIN_WHITELIST = (
-    'https://21debc4f3f65.ngrok-free.app'
+    'https://be2d994decd4.ngrok-free.app'
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ########### End Cors 
