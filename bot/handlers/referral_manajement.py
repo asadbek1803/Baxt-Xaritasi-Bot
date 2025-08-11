@@ -70,6 +70,7 @@ async def referral_payment_made(callback: types.CallbackQuery, state: FSMContext
 @router.message(ReferralPaymentState.WAITING_FOR_SCREENSHOT)
 async def process_referral_payment_screenshot(message: types.Message, state: FSMContext):
     data = await state.get_data()
+    global xabar
     payment_id = data.get("referral_payment_id")
     user_id = str(message.from_user.id)
     user = await TelegramUser.objects.filter(telegram_id=user_id).afirst()
@@ -101,7 +102,7 @@ async def process_referral_payment_screenshot(message: types.Message, state: FSM
         [InlineKeyboardButton(text="❌ Yo'q, bekor qilish", callback_data=f"reject_referral_{payment.id}")]
     ])
     try:
-        await message.bot.send_photo(
+        xabar = await message.bot.send_photo(
             chat_id=referrer.telegram_id,
             photo=photo.file_id,
             caption=(
@@ -136,7 +137,7 @@ async def confirm_referral_payment(callback: types.CallbackQuery):
         
     payment.status = 'CONFIRMED'
     await payment.asave(update_fields=['status'])
-    
+    await xabar.delete()  # Referrerga yuborilgan xabarni o'chirish
     # User obyektini yangilash
     payment_user = payment.user
     
@@ -185,7 +186,7 @@ async def reject_referral_payment(callback: types.CallbackQuery):
     
     if not payment:
         return await callback.answer("❌ To'lov topilmadi!", show_alert=True)
-        
+    await xabar.delete()
     payment.status = 'REJECTED'
     await payment.asave(update_fields=['status'])
     

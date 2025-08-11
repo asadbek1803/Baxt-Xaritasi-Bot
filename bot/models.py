@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from asgiref.sync import sync_to_async
 from datetime import datetime
+from core.settings import TELEGRAM_BOT_USERNAME
 from .constants import (
     REGIONS,
     GENDER as GENDER_CHOICES,
@@ -212,8 +213,8 @@ class TelegramUser(models.Model):
         if not self.referral_code:
             self.referral_code = self.telegram_id
             self.save()
-        bot_username = "testBot"  # Bu yerga o'zingizning bot username-ini yozing
-        return f"https://t.me/{bot_username}?start={self.referral_code}"
+          # Bu yerga o'zingizning bot username-ini yozing
+        return f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={self.referral_code}"
     
     @sync_to_async
     def aget_referral_code(self):

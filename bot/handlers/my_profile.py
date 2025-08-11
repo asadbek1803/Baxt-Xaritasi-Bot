@@ -13,6 +13,15 @@ from bot.models import TelegramUser
 
 router = Router()
 
+
+def format_user_level(level):
+    """Convert level_2 to 2-bosqich format"""
+    if level and level.startswith("level_"):
+        level_num = level.split("_")[1]
+        return f"{level_num}-bosqich"
+    return level or "0-bosqich"  # Default if None
+
+
 @sync_to_async
 def get_user_referrer_info(invited_by):
     if not invited_by:
@@ -38,57 +47,57 @@ LEVEL_MAPPING = {
     "6-bosqich": "level_6",
     "7-bosqich": "level_7",
 }
-
 @router.message(F.text == "👤 Mening hisobim")
 async def my_profile_handler(message: types.Message, bot: Bot):
     """Foydalanuvchi profilini ko'rsatish"""
-    user_id = str(message.from_user.id)
-    user_info = await fetch_user(user_id)
-
-    if not user_info:
-        await message.answer("❌ Sizning profilingiz topilmadi. Iltimos, avval ro'yxatdan o'ting.")
-        return
-
-    print(f"User: {user_info.full_name}, Level: {user_info.level}, is_confirmed: {user_info.is_confirmed}")
-    
-    # Foydalanuvchi levelini tekshirish
-    is_low_level = user_info.level in ["0-bosqich","level_0","1-bosqich", "level_1"]
-    
     try:
-        # Asosiy profil ma'lumotlari (barcha levellar uchun)
-        referrer_info = await get_user_referrer_info(user_info.invited_by) if not is_low_level else "Mavjud emas"
+        user_id = str(message.from_user.id)
+        user_info = await fetch_user(user_id)
+
+        if not user_info:
+            await message.answer("❌ Sizning profilingiz topilmadi. Iltimos, avval ro'yxatdan o'ting.")
+            return
+
+        # Format the level correctly
+        user_level = format_user_level(user_info.level)
+        print(f"User: {user_info.full_name}, Level: {user_level}, is_confirmed: {user_info.is_confirmed}")
+
+        # Get all needed data first using sync_to_async
+        referrer_info = await get_user_referrer_info(user_info.invited_by)
         
-        # Telefon raqamni formatlash
-        phone_display = user_info.phone_number if user_info.phone_number else "Mavjud emas"
+        # Format phone number
+        phone_display = user_info.phone_number if await sync_to_async(lambda: user_info.phone_number)() else "Mavjud emas"
         
-        # Username-ni formatlash
-        username_display = f"@{user_info.telegram_username}" if user_info.telegram_username else "mavjud emas"
+        # Format username
+        username_display = f"@{user_info.telegram_username}" if await sync_to_async(lambda: user_info.telegram_username)() else "mavjud emas"
         
-        # Jinsni formatlash
-        gender_display = "Erkak" if user_info.gender == "M" else "Ayol" if user_info.gender == "F" else "Belgilanmagan"
+        # Format gender
+        gender_display = await sync_to_async(lambda: "Erkak" if user_info.gender == "M" else "Ayol" if user_info.gender == "F" else "Belgilanmagan")()
         
-        # Registration date-ni formatlash
-        reg_date = user_info.registration_date.strftime('%d.%m.%Y %H:%M') if user_info.registration_date else "Noma'lum"
+        # Format registration date - THIS IS THE MAIN FIX
+        reg_date = "Noma'lum"
+        if user_info.registration_date:
+            reg_date = await sync_to_async(lambda: user_info.registration_date.strftime('%d.%m.%Y %H:%M'))()
         
-        # Referral count-ni olish (faqat yuqori levellar uchun)
-        referral_count = getattr(user_info, 'referral_count', 0) if not is_low_level else 0
-        
+        # Get referral count
+        referral_count = await sync_to_async(lambda: getattr(user_info, 'referral_count', 0))()
+
         profile_info = (
             f"👤 <b>Shaxsiy ma'lumotlar</b>\n"
             f"├ Ism: <b>{user_info.full_name}</b>\n"
-            f"├ Yoshi: <b>{user_info.age}</b>\n"
+            f"├ Yoshi: <b>{await sync_to_async(lambda: user_info.age)()}</b>\n"
             f"├ Jinsi: <b>{gender_display}</b>\n"
             f"├ Telefon: <code>{phone_display}</code>\n"
             f"├ Username: {username_display}\n"
             f"├ ID: <code>{user_info.telegram_id}</code>\n\n"
 
             f"📍 <b>Joylashuv</b>\n"
-            f"├ Hudud: <b>{user_info.region}</b>\n"
-            f"├ Kasbi: <b>{user_info.profession}</b>\n\n"
+            f"├ Hudud: <b>{await sync_to_async(lambda: user_info.region)()}</b>\n"
+            f"├ Kasbi: <b>{await sync_to_async(lambda: user_info.profession)()}</b>\n\n"
 
             f"📅 <b>Faollik</b>\n"
             f"├ Ro'yxatdan o'tgan: <b>{reg_date}</b>\n"
-            f"├ Level: <b>{user_info.level}</b>\n\n"
+            f"├ Level: <b>{user_level}</b>\n\n"
         )
         
         # Referal tizimi (barcha levellar uchun ko'rsatamiz)
@@ -224,10 +233,12 @@ async def show_user_stats(callback: types.CallbackQuery):
             return
         
         # Referral count-ni olish
-        referral_count = getattr(user_info, 'referral_count', 0)
+        referral_count = await sync_to_async(lambda: getattr(user_info, 'referral_count', 0))()
         
         # Registration date-ni formatlash
-        reg_date = user_info.registration_date.strftime('%d.%m.%Y') if user_info.registration_date else "Noma'lum"
+        reg_date = "Noma'lum"
+        if user_info.registration_date:
+            reg_date = await sync_to_async(lambda: user_info.registration_date.strftime('%d.%m.%Y'))()
         
         stats_info = (
             f"📊 <b>Foydalanuvchi statistikasi</b>\n\n"
@@ -235,7 +246,7 @@ async def show_user_stats(callback: types.CallbackQuery):
             f"🆔 ID: <code>{user_info.telegram_id}</code>\n\n"
             f"👥 Taklif qilganlar soni: <b>{referral_count} ta</b>\n"
             f"📅 Ro'yxatdan o'tgan: <b>{reg_date}</b>\n"
-            f"🎯 Level: <b>{user_info.level}</b>\n"
+            f"🎯 Level: <b>{await sync_to_async(lambda: user_info.level)()}</b>\n"
             f"✅ Status: <b>{'Tasdiqlangan' if user_info.is_confirmed else 'Tasdiqlanmagan'}</b>\n\n"
         )
         

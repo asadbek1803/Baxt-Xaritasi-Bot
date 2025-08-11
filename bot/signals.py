@@ -3,6 +3,7 @@ import requests
 from django.dispatch import receiver
 from django.db.models.signals import post_save, pre_save
 from django.core.cache import cache
+from core.settings import TELEGRAM_BOT_TOKEN
 from .models import Payments, Notification 
 from bot.buttons.default.menu import get_menu_keyboard
 
@@ -12,7 +13,7 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
     if instance.status == 'CONFIRMED' and not instance.is_confirmed:
         instance.confirm_payment()
 
-        telegram_token = os.getenv("BOT_TOKEN", "Defualt token")
+        
         chat_id = instance.user.telegram_id
         message = f"✅ To'lov muvaffaqiyatli amalga oshirildi!\n{instance.amount} so'm"
         reply_markup = get_menu_keyboard()
@@ -22,7 +23,7 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
             'reply_markup': reply_markup
         }
 
-        url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         try:
             response = requests.post(url, json=payload)
             response.raise_for_status()

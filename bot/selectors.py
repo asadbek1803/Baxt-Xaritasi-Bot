@@ -1,5 +1,6 @@
 from asgiref.sync import sync_to_async
 from django.db.models import Q, Count
+from core.settings import TELEGRAM_BOT_USERNAME
 from .models import (
     TelegramUser,
     MandatoryChannel,
@@ -580,12 +581,12 @@ def get_user_referral_link_async(user_info):
             return user_info.get_referral_link()
         else:
             # Agar method yo'q bo'lsa, manual link yaratish
-            bot_username = "testBot"  # Botingizning username ini yozing
-            return f"https://t.me/{bot_username}?start={user_info.telegram_id}"
+              # Botingizning username ini yozing
+            return f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={user_info.telegram_id}"
     except Exception as e:
         print(f"Error in get_user_referral_link_async: {e}")
-        bot_username = "testBot"  # Botingizning username ini yozing
-        return f"https://t.me/{bot_username}?start={user_info.telegram_id}"
+          # Botingizning username ini yozing
+        return f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={user_info.telegram_id}"
 
 @sync_to_async
 def update_user_card_info(telegram_id, card_number, card_holder_name):

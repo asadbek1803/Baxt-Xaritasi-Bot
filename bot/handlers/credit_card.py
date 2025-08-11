@@ -61,12 +61,7 @@ async def show_card_info(callback: types.CallbackQuery):
                 )
             )
         
-        builder.row(
-            types.InlineKeyboardButton(
-                text="🔙 Orqaga",
-                callback_data="back_to_profile"
-            )
-        )
+       
         
         await callback.message.edit_text(
             text=card_info_text,
