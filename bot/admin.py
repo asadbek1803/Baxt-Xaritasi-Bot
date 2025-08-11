@@ -8,7 +8,7 @@ from django.utils import timezone
 from .models import (
     TelegramUser, Payments, 
     MandatoryChannel, PrivateChannel, Notification,
-    Kurslar, CourseParticipant
+    Kurslar, CourseParticipant, Gifts
 )
 
 # PrivateChannel Inline - Konkurs ichida qo'shish uchun
@@ -507,6 +507,17 @@ class NotificationAdmin(ModelAdmin):
     )
     
     readonly_fields = ('created_at', 'read_at')
+
+
+
+@admin.register(Gifts)
+class GiftsAdmin(ModelAdmin):
+    def has_add_permission(self, request):
+        if Gifts.objects.count() >= 1:
+            return False
+        return super().has_add_permission(request)
+
+    list_display = ('name', 'description')
 
 
 # Admin panelni sozlash

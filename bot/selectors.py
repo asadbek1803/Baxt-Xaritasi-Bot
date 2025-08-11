@@ -6,7 +6,8 @@ from .models import (
     MandatoryChannel,
     Payments,
     Kurslar,
-    ReferralPayment
+    ReferralPayment,
+    Gifts
 )
 from datetime import datetime
 import uuid
@@ -602,3 +603,253 @@ def update_user_card_info(telegram_id, card_number, card_holder_name):
     except Exception as e:
         print(f"Error updating card info: {e}")
         return False
+
+# Qo'shimcha async funksiyalar selectors.py-ga qo'shish kerak:
+
+# User field access-larni async qilish uchun qo'shimcha funksiyalar
+@sync_to_async
+def get_user_phone(user):
+    """User phone number-ni async olish"""
+    return user.phone_number if user.phone_number else "Mavjud emas"
+
+@sync_to_async  
+def get_user_username(user):
+    """User telegram username-ni async olish"""
+    return f"@{user.telegram_username}" if user.telegram_username else "mavjud emas"
+
+@sync_to_async
+def get_user_gender_display(user):
+    """User gender-ni display formatda async olish"""
+    if user.gender == "M":
+        return "Erkak"
+    elif user.gender == "F":
+        return "Ayol"
+    else:
+        return "Belgilanmagan"
+
+@sync_to_async
+def get_user_age(user):
+    """User age-ni async olish"""
+    return user.age
+
+@sync_to_async
+def get_user_region(user):
+    """User region-ni async olish"""
+    return user.region
+
+@sync_to_async
+def get_user_profession(user):
+    """User profession-ni async olish"""
+    return user.profession
+
+@sync_to_async
+def get_user_registration_date_formatted(user):
+    """User registration date-ni formatted holatda async olish"""
+    if user.registration_date:
+        return user.registration_date.strftime('%d.%m.%Y %H:%M')
+    return "Noma'lum"
+
+@sync_to_async
+def get_user_level_safe(user):
+    """User level-ni async olish"""
+    return user.level
+
+@sync_to_async
+def get_user_referral_count_safe(user):
+    """User referral count-ni async olish"""
+    return getattr(user, 'referral_count', 0)
+
+@sync_to_async
+def get_user_confirmation_status(user):
+    """User confirmation status-ni async olish"""
+    return user.is_confirmed
+
+# MAIN FUNCTION - Optimized single function to get all user profile data at once
+@sync_to_async
+def get_user_profile_data(user):
+    try:
+        # Foydalanuvchi ma'lumotlarini faqat kerakli maydonlar bilan yuklaymiz
+        user = TelegramUser.objects.only(
+            "full_name",
+            "telegram_id",
+            "phone_number",
+            "telegram_username",
+            "gender",
+            "age",
+            "region",
+            "profession",
+            "registration_date",
+            "level",
+            "is_confirmed"
+        ).get(pk=user.pk)
+
+        return {
+            'full_name': user.full_name,
+            'telegram_id': user.telegram_id,
+            'phone': user.phone_number or "Mavjud emas",
+            'username': f"@{user.telegram_username}" if user.telegram_username else "mavjud emas",
+            'gender': "Erkak" if user.gender == "M" else "Ayol" if user.gender == "F" else "Belgilanmagan",
+            'age': user.age,
+            'region': user.region,
+            'profession': user.profession,
+            'registration_date': user.registration_date.strftime('%d.%m.%Y %H:%M') if user.registration_date else "Noma'lum",
+            'level': user.level,
+            'referral_count': getattr(user, 'referral_count', 0),
+            'is_confirmed': user.is_confirmed
+        }
+    except Exception as e:
+        print(f"Error in get_user_profile_data: {e}")
+        return {
+            'full_name': getattr(user, 'full_name', 'Noma\'lum'),
+            'telegram_id': getattr(user, 'telegram_id', ''),
+            'phone': "Mavjud emas",
+            'username': "mavjud emas",
+            'gender': "Belgilanmagan",
+            'age': getattr(user, 'age', 0),
+            'region': getattr(user, 'region', 'Noma\'lum'),
+            'profession': getattr(user, 'profession', 'Noma\'lum'),
+            'registration_date': "Noma'lum",
+            'level': getattr(user, 'level', '0-bosqich'),
+            'referral_count': 0,
+            'is_confirmed': False
+        }
+    
+
+
+@sync_to_async
+def get_user_profile_by_telegram_id(telegram_id: str):
+    """
+    Barcha kerakli user ma'lumotlarini dict ko'rinishida qaytaradi.
+    - Barcha ORM ishlari bu sync_to_async ichida bajariladi.
+    """
+    try:
+        user = TelegramUser.objects.select_related('invited_by').filter(telegram_id=telegram_id).first()
+        if not user:
+            return None
+
+        invited = user.invited_by
+        invited_data = None
+        if invited:
+            invited_data = {
+                "telegram_id": getattr(invited, "telegram_id", None),
+                "full_name": getattr(invited, "full_name", None),
+                "telegram_username": getattr(invited, "telegram_username", None)
+            }
+
+        return {
+            'full_name': user.full_name,
+            'telegram_id': str(user.telegram_id),
+            'phone': user.phone_number or "Mavjud emas",
+            'username': f"@{user.telegram_username}" if user.telegram_username else "mavjud emas",
+            'gender': "Erkak" if user.gender == "M" else "Ayol" if user.gender == "F" else "Belgilanmagan",
+            'age': getattr(user, 'age', "Noma'lum"),
+            'region': getattr(user, 'region', "Noma'lum"),
+            'profession': getattr(user, 'profession', "Noma'lum"),
+            'registration_date': user.registration_date.strftime('%d.%m.%Y %H:%M') if user.registration_date else "Noma'lum",
+            'level': getattr(user, 'level', '0-bosqich'),
+            'referral_count': getattr(user, 'referral_count', 0),
+            'is_confirmed': bool(user.is_confirmed),
+            'invited_by': invited_data
+        }
+    except Exception as e:
+        print(f"[selectors.get_user_profile_by_telegram_id] Error: {e}")
+        return None
+
+
+@sync_to_async
+def get_referrer_display_by_telegram_id(inviter_telegram_id: str):
+    """
+    Inviter telegram_id bo'yicha display string qaytaradi (masalan: 'Ism (@username)') yoki "Yo'q".
+    """
+    try:
+        if not inviter_telegram_id:
+            return "Yo'q"
+
+        inviter = TelegramUser.objects.filter(telegram_id=inviter_telegram_id).first()
+        if not inviter:
+            return "Yo'q"
+        if inviter.telegram_username:
+            return f"{inviter.full_name} (@{inviter.telegram_username})"
+        return inviter.full_name
+    except Exception as e:
+        print(f"[selectors.get_referrer_display_by_telegram_id] Error: {e}")
+        return "Yo'q"
+
+
+@sync_to_async
+def get_course_for_next_level_by_user_level(user_level: str):
+    """
+    user_level (masalan '7-bosqich' yoki 'level_7') ga qarab keyingi kursni qaytaradi.
+    Return: dict {'id': ..., 'name': ...} yoki None
+    """
+    try:
+        # normalize
+        if not user_level:
+            user_level = "0-bosqich"
+        if user_level.startswith("level_"):
+            # level_1 -> 1-bosqich
+            try:
+                num = user_level.split("_")[1]
+                user_level = f"{num}-bosqich"
+            except Exception:
+                user_level = "0-bosqich"
+
+        try:
+            current_num = int(user_level.split("-")[0])
+        except Exception:
+            current_num = 0
+
+        # agar 7-dan yuqori bo'lsa birinchi faol kursni qaytaramiz
+        if current_num > 6:
+            course = Kurslar.objects.filter(is_active=True).order_by('-created_at').first()
+        else:
+            next_level_num = current_num + 1
+            next_level = f"{next_level_num}-bosqich"
+            course_level_field = LEVEL_MAPPING.get(next_level, next_level)
+            course = Kurslar.objects.filter(is_active=True, level=course_level_field).order_by('-created_at').first()
+
+        if not course:
+            return None
+
+        return {
+            "id": course.id,
+            "name": getattr(course, "name", "Noma'lum")
+        }
+    except Exception as e:
+        print(f"[selectors.get_course_for_next_level_by_user_level] Error: {e}")
+        return None
+
+
+@sync_to_async
+def get_referral_link_for_user(telegram_id: str):
+    """
+    Tegishli referal linkni qaytaradi. Agar modelda get_referral_link method bo'lsa undan foydalanadi,
+    aks holda statik link yasaydi.
+    """
+    try:
+        user = TelegramUser.objects.filter(telegram_id=telegram_id).first()
+        if not user:
+            return f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={telegram_id}"
+
+        # prefer model method if exists (kiritilgan bo'lsa)
+        if hasattr(user, "get_referral_link"):
+            try:
+                return user.get_referral_link()
+            except Exception:
+                pass
+
+        return f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={telegram_id}"
+    except Exception as e:
+        print(f"[selectors.get_referral_link_for_user] Error: {e}")
+        return f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={telegram_id}"
+    
+@sync_to_async
+def get_gifts_is_active():
+    """
+    Faol sovg'alarni olish
+    """
+    try:
+        return list(Gifts.objects.filter(is_active=True).order_by('-created_at'))
+    except Exception as e:
+        print(f"[selectors.get_gifts_is_active] Error: {e}")
+        return []

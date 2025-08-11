@@ -15,7 +15,7 @@ def get_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="👥 Mening jamoam"),
             ],
             [
-                KeyboardButton(text="🎉 Konkurslar"),
+                KeyboardButton(text="❓ Yordam"),
                 KeyboardButton(text="🏆 Sovg'alar"),
             ]
         ],

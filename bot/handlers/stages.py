@@ -119,7 +119,7 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
     """
     user_id = str(callback.from_user.id)
     action_data = callback.data.split("_")
-    
+    user = await get_user(user_id)
     if len(action_data) < 3:
         await callback.answer("❌ Noto'g'ri ma'lumot")
         return
@@ -150,6 +150,7 @@ Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
 Kursni sotib olishni xohlaysizmi?
             """
             
+
             keyboard = InlineKeyboardMarkup(inline_keyboard=[
                 [
                     InlineKeyboardButton(
@@ -159,17 +160,20 @@ Kursni sotib olishni xohlaysizmi?
                 ],
                 [
                     InlineKeyboardButton(
-                        text="📢 Referral yaratish",
-                        callback_data=f"create_referral_{course.id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
                         text="◀️ Orqaga",
                         callback_data="back_to_stages"
                     )
                 ]
             ])
+            if user.is_confirmed == False:
+                keyboard.inline_keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        text="📢 Referral yaratish",
+                        callback_data=f"create_referral_{course.id}"
+                    )
+                ]
+            )
             
             await callback.message.edit_text(
                 text,
@@ -209,18 +213,20 @@ Kursni sotib olishni xohlaysizmi?
                 ],
                 [
                     InlineKeyboardButton(
-                        text="📢 Referral yaratish",
-                        callback_data=f"create_referral_{course.id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
                         text="◀️ Orqaga",
                         callback_data="back_to_stages"
                     )
                 ]
             ])
-            
+            if user.is_confirmed == False:
+                keyboard.inline_keyboard.append(
+                    [
+                        InlineKeyboardButton(
+                            text="📢 Referral yaratish",
+                            callback_data=f"create_referral_{course.id}"
+                        )
+                    ]
+                )
             await callback.message.edit_text(
                 text,
                 reply_markup=keyboard,

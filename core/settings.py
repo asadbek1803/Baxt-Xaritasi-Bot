@@ -72,11 +72,11 @@ LOGGING = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['https://be2d994decd4.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://ee8d635bf3c8.ngrok-free.app']
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = 'be2d994decd4.ngrok-free.app'
+CSRF_COOKIE_DOMAIN = 'ee8d635bf3c8.ngrok-free.app'
 CORS_ORIGIN_WHITELIST = (
-    'https://be2d994decd4.ngrok-free.app'
+    'https://ee8d635bf3c8.ngrok-free.app'
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ########### End Cors 
@@ -283,6 +283,11 @@ UNFOLD = {
                         "title": ("Kurslar"),
                         "link": reverse_lazy("admin:bot_kurslar_changelist"),
                         "icon": "book",
+                    },
+                    {
+                        "title": ("Gifts"),
+                        "link": reverse_lazy("admin:bot_gifts_changelist"),
+                        "icon": "card_giftcard",
                     },
 
                 ],

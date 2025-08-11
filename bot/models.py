@@ -642,3 +642,36 @@ class Notification(models.Model):
             models.Index(fields=['notification_type', 'created_at']),
         ]
 
+
+class Gifts(models.Model):
+    name = models.CharField(max_length=255, verbose_name="Sovg'a nomi")
+    description = models.TextField(verbose_name="Sovg'alar haqida ma'lumotnoma")
+    image = models.ImageField(
+        upload_to='gifts', null=True, blank=True,
+        verbose_name="Sovg'a rasmi",
+        help_text="Sovg'a uchun rasm (agar mavjud bo'lsa)"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name="Yaratilgan sana",
+        help_text="Sovg'a qachon yaratilgan"
+    )
+    is_active = models.BooleanField(
+        default=True, verbose_name="Faoliyat holati",
+        help_text="Sovg'a faolmi yoki yo'qmi"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, verbose_name="Yangilangan sana",
+        help_text="Sovg'a qachon yangilangan"
+    )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Sovg'a"
+        verbose_name_plural = "Sovg'alar"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['is_active']),
+        ]
