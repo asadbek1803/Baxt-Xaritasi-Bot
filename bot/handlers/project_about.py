@@ -1,4 +1,5 @@
 from aiogram import Router, F, types
+from bot.buttons.default.back import get_back_keyboard
 
 router = Router()
 
@@ -17,5 +18,6 @@ async def project_about_handler(message: types.Message):
         "📞 Savollar va takliflar uchun:\n"
         "└ Administratorga murojaat qiling\n\n"
         "🚀 Keling, birgalikda muvaffaqiyatga erishamiz!",
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=get_back_keyboard()
     )

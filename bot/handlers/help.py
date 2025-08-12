@@ -1,4 +1,5 @@
 from aiogram import Router, F, types
+from bot.buttons.default.back import get_back_keyboard
 
 router = Router()
 
@@ -25,4 +26,5 @@ async def help_handler(message: types.Message):
 
 ❓ Qo'shimcha yordam uchun adminga murojaat qiling: @admin
 """
-    await message.answer(help_text)
+    await message.answer(help_text, 
+                         reply_markup=get_back_keyboard(), parse_mode="HTML")

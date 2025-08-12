@@ -9,6 +9,13 @@ from .models import (
     ReferralPayment,
     Gifts
 )
+from bot.services.notification import (
+    notify_level_upgrade,
+    notify_new_referral,
+    notify_referrer_changed,
+    notify_referrer_warning,
+    notify_referral_removed
+)
 from datetime import datetime
 import uuid
 
@@ -392,10 +399,104 @@ def check_user_can_access_level(telegram_id: str, target_level: str):
     except Exception as e:
         print(f"Error checking user access level: {e}")
         return False
+@sync_to_async
+def get_root_referrer(user_id: str):
+    """Foydalanuvchining eng yuqori (root) referrerini topish"""
+    user = TelegramUser.objects.filter(telegram_id=user_id).first()
+    if not user or not user.invited_by:
+        return None
+    
+    current = user
+    while current.invited_by:
+        current = current.invited_by
+    
+    return current
 
 @sync_to_async
+def create_referral_payment_request(user_id: str, amount: float):
+    """Referral to'lov so'rovini yaratish (avtomatik ravishda root referrerga)"""
+    user = TelegramUser.objects.filter(telegram_id=user_id).first()
+    if not user:
+        return None
+    
+    root_referrer = get_root_referrer(user_id)
+    if not root_referrer:
+        return None
+    
+    payment = ReferralPayment(
+        user=user,
+        referrer=root_referrer,
+        amount=amount,
+        payment_type='REFERRAL_BONUS',
+        status='PENDING'
+    )
+    payment.save()
+    return payment
+
+@sync_to_async
+def get_user_referral_network_stats(user_id: str) -> dict:
+    """Foydalanuvchining butun referral tarmog'i bo'yicha statistika"""
+    # To'g'ridan-to'g'ri referrallar
+    direct = TelegramUser.objects.filter(invited_by__telegram_id=user_id)
+    
+    # Butun tarmoq (rekursiv)
+    def get_network_count(parent_id: str):
+        count = 0
+        children = TelegramUser.objects.filter(invited_by__telegram_id=parent_id)
+        for child in children:
+            count += 1 + get_network_count(child.telegram_id)
+        return count
+    
+    total_network = get_network_count(user_id)
+    
+    return {
+        'direct_referrals': direct.count(),
+        'total_network': total_network,
+        'active_in_network': TelegramUser.objects.filter(
+            invited_by__in=direct
+        ).count()
+    }
+
+@sync_to_async
+def get_referral_network_payments(user_id: str):
+    """Foydalanuvchining butun tarmog'idan kelgan to'lovlar"""
+    # Faqat root referrer uchun ishlaydi
+    return list(ReferralPayment.objects.filter(
+        referrer__telegram_id=user_id,
+        payment_type='REFERRAL_BONUS'
+    ).order_by('-created_at'))
+
+@sync_to_async
+def get_referral_network_tree(user_id: str, depth: int = 5):
+    """Butun referral tarmog'ini ko'rish"""
+    def build_tree(parent_id: str, current_depth: int = 0):
+        if current_depth >= depth:
+            return []
+        
+        children = TelegramUser.objects.filter(
+            invited_by__telegram_id=parent_id
+        ).order_by('-registration_date')
+        
+        result = []
+        for child in children:
+            child_data = {
+                'user': child,
+                'level': current_depth + 1,
+                'children': build_tree(child.telegram_id, current_depth + 1)
+            }
+            result.append(child_data)
+        
+        return result
+    
+    return {
+        'root': TelegramUser.objects.get(telegram_id=user_id),
+        'tree': build_tree(user_id)
+    }
+
+# Updated referral functions with root logic
+@sync_to_async
 def get_user_referrals(user_id: str, limit: int = 8, offset: int = 0):
-    """Foydalanuvchining referallarini olish (pagination bilan)"""
+    """Foydalanuvchining to'g'ridan-to'g'ri referallarini olish"""
     return list(
         TelegramUser.objects.filter(
             invited_by__telegram_id=user_id
@@ -404,14 +505,14 @@ def get_user_referrals(user_id: str, limit: int = 8, offset: int = 0):
 
 @sync_to_async
 def get_user_referrals_count(user_id: str) -> int:
-    """Foydalanuvchining referallari sonini olish"""
+    """Foydalanuvchining to'g'ridan-to'g'ri referallari sonini olish"""
     return TelegramUser.objects.filter(
         invited_by__telegram_id=user_id
     ).count()
 
 @sync_to_async
 def get_confirmed_referrals_count(user_id: str) -> int:
-    """Foydalanuvchining tasdiqlangan referallari sonini olish"""
+    """Foydalanuvchining tasdiqlangan to'g'ridan-to'g'ri referallari sonini olish"""
     return TelegramUser.objects.filter(
         invited_by__telegram_id=user_id,
         is_confirmed=True
@@ -419,7 +520,7 @@ def get_confirmed_referrals_count(user_id: str) -> int:
 
 @sync_to_async
 def get_monthly_referrals_count(user_id: str) -> int:
-    """Bu oy qo'shilgan referallar sonini olish"""
+    """Bu oy qo'shilgan to'g'ridan-to'g'ri referallar sonini olish"""
     start_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return TelegramUser.objects.filter(
         invited_by__telegram_id=user_id,
@@ -428,7 +529,7 @@ def get_monthly_referrals_count(user_id: str) -> int:
 
 @sync_to_async
 def get_referrals_by_level(user_id: str) -> dict:
-    """Referallarni daraja bo'yicha guruplash"""
+    """To'g'ridan-to'g'ri referallarni daraja bo'yicha guruplash"""
     referrals = TelegramUser.objects.filter(
         invited_by__telegram_id=user_id
     ).values('level').annotate(count=Count('level')).order_by('level')
@@ -465,7 +566,7 @@ def get_user_referral_tree(user_id: str, depth: int = 3):
 
 @sync_to_async
 def get_user_referral_levels_stats(user_id: str) -> dict:
-    """Foydalanuvchining referallari bo'yicha batafsil statistika"""
+    """Foydalanuvchining butun tarmoq referallari bo'yicha batafsil statistika"""
     # 1-daraja referallar (to'g'ridan-to'g'ri)
     level_1 = TelegramUser.objects.filter(invited_by__telegram_id=user_id)
     
@@ -479,16 +580,28 @@ def get_user_referral_levels_stats(user_id: str) -> dict:
         invited_by__invited_by__invited_by__telegram_id=user_id
     )
     
+    # 4-daraja referallar
+    level_4 = TelegramUser.objects.filter(
+        invited_by__invited_by__invited_by__invited_by__telegram_id=user_id
+    )
+    
+    # 5-daraja referallar
+    level_5 = TelegramUser.objects.filter(
+        invited_by__invited_by__invited_by__invited_by__invited_by__telegram_id=user_id
+    )
+    
     return {
         'level_1': level_1.count(),
         'level_2': level_2.count(), 
         'level_3': level_3.count(),
-        'total': level_1.count() + level_2.count() + level_3.count()
+        'level_4': level_4.count(),
+        'level_5': level_5.count(),
+        'total': level_1.count() + level_2.count() + level_3.count() + level_4.count() + level_5.count()
     }
 
 @sync_to_async
 def get_top_referrers(limit: int = 10):
-    """Eng ko'p referalga ega foydalanuvchilar"""
+    """Eng ko'p to'g'ridan-to'g'ri referalga ega foydalanuvchilar"""
     return list(
         TelegramUser.objects.annotate(
             referral_count_db=Count('referrals')
@@ -499,7 +612,7 @@ def get_top_referrers(limit: int = 10):
 
 @sync_to_async
 def search_referrals(user_id: str, search_query: str, limit: int = 10):
-    """Referallar orasida qidirish"""
+    """To'g'ridan-to'g'ri referallar orasida qidirish"""
     return list(
         TelegramUser.objects.filter(
             invited_by__telegram_id=user_id
@@ -511,27 +624,8 @@ def search_referrals(user_id: str, search_query: str, limit: int = 10):
     )
 
 @sync_to_async
-def create_referral_payment_request(user_id: str, referrer_id: str, amount: float):
-    """Referral to'lov so'rovini yaratish"""
-    user = TelegramUser.objects.filter(telegram_id=user_id).first()
-    referrer = TelegramUser.objects.filter(telegram_id=referrer_id).first()
-    
-    if not user or not referrer:
-        return None
-    
-    payment = ReferralPayment(
-        user=user,
-        referrer=referrer,
-        amount=amount,
-        payment_type='REFERRAL_BONUS',
-        status='PENDING'
-    )
-    payment.save()
-    return payment
-
-@sync_to_async
 def get_pending_referral_payments(referrer_id: str):
-    """Tasdiqlanishi kerak bo'lgan referral to'lovlarni olish"""
+    """Root referrer uchun tasdiqlanishi kerak bo'lgan referral to'lovlarni olish"""
     return list(ReferralPayment.objects.filter(
         referrer__telegram_id=referrer_id,
         payment_type='REFERRAL_BONUS',
@@ -571,6 +665,7 @@ def reject_referral_payment(payment_id: str, admin_user_id: str):
         payment.save()
         return True
     return False
+
 
 # NEW ASYNC FUNCTION FOR REFERRAL LINK
 @sync_to_async
@@ -769,7 +864,7 @@ def get_referrer_display_by_telegram_id(inviter_telegram_id: str):
         if not inviter:
             return "Yo'q"
         if inviter.telegram_username:
-            return f"{inviter.full_name} (@{inviter.telegram_username})"
+            return f"{inviter.full_name} ({inviter.telegram_username})"
         return inviter.full_name
     except Exception as e:
         print(f"[selectors.get_referrer_display_by_telegram_id] Error: {e}")
@@ -853,3 +948,597 @@ def get_gifts_is_active():
     except Exception as e:
         print(f"[selectors.get_gifts_is_active] Error: {e}")
         return []
+
+
+# Referal foydalanuvchilarni tekshirish
+def compare_levels(level1: str, level2: str) -> int:
+    """
+    Levellarni solishtirish funksiyasi
+    Returns:
+        1 agar level1 > level2
+        0 agar level1 == level2
+        -1 agar level1 < level2
+    """
+    def extract_level_number(level: str) -> int:
+        try:
+            if level.startswith('level_'):
+                return int(level.split('_')[1])
+            elif '-bosqich' in level:
+                return int(level.split('-')[0])
+            return 0
+        except (ValueError, IndexError):
+            return 0
+    
+    num1 = extract_level_number(level1)
+    num2 = extract_level_number(level2)
+    
+    if num1 > num2:
+        return 1
+    elif num1 == num2:
+        return 0
+    else:
+        return -1
+
+@sync_to_async
+def check_and_handle_referrer_level_advancement(user_telegram_id: str):
+    """
+    Foydalanuvchi darajasi refereridan yuqori bo'lsa,
+    admin uchun vakolatlarni tekshiradi va kerakli harakatlarni bajaradi
+    
+    Returns:
+        dict: {
+            'needs_replacement': bool,
+            'current_referrer': dict or None,
+            'notification_sent': bool,
+            'message': str
+        }
+    """
+    try:
+        # Foydalanuvchini topish
+        user = TelegramUser.objects.select_related('invited_by').filter(
+            telegram_id=user_telegram_id
+        ).first()
+        
+        if not user:
+            return {
+                'needs_replacement': False,
+                'current_referrer': None,
+                'notification_sent': False,
+                'message': 'Foydalanuvchi topilmadi'
+            }
+        
+        # Agar referrer yo'q bo'lsa
+        if not user.invited_by:
+            return {
+                'needs_replacement': False,
+                'current_referrer': None,
+                'notification_sent': False,
+                'message': 'Foydalanuvchining referreri mavjud emas'
+            }
+        
+        referrer = user.invited_by
+        
+        # Levellarni solishtirish
+        level_comparison = compare_levels(user.level, referrer.level)
+        
+        if level_comparison <= 0:
+            # User darajasi referrer darajasidan kichik yoki teng
+            return {
+                'needs_replacement': False,
+                'current_referrer': {
+                    'telegram_id': referrer.telegram_id,
+                    'full_name': referrer.full_name,
+                    'level': referrer.level
+                },
+                'notification_sent': False,
+                'message': 'Referrer darajasi mos, almashtirish kerak emas'
+            }
+        
+        # User darajasi referrerdan yuqori - almashtirish kerak
+        return {
+            'needs_replacement': True,
+            'current_referrer': {
+                'telegram_id': referrer.telegram_id,
+                'full_name': referrer.full_name,
+                'level': referrer.level,
+                'telegram_username': referrer.telegram_username
+            },
+            'user_data': {
+                'telegram_id': user.telegram_id,
+                'full_name': user.full_name,
+                'level': user.level
+            },
+            'notification_sent': True,  # Bu async task bilan yuboriladi
+            'message': f'Foydalanuvchi {user.full_name} darajasi ({user.level}) referrer {referrer.full_name} darajasidan ({referrer.level}) yuqori. Almashtirish kerak!'
+        }
+        
+    except Exception as e:
+        print(f"Error in check_and_handle_referrer_level_advancement: {e}")
+        return {
+            'needs_replacement': False,
+            'current_referrer': None,
+            'notification_sent': False,
+            'message': f'Xatolik yuz berdi: {str(e)}'
+        }
+
+async def send_referrer_warning_notification(referrer_telegram_id: str, advanced_user_name: str, 
+                                           advanced_user_level: str, referrer_level: str):
+    """
+    Referrerga ogohlantirish xabarini Telegram API orqali yuborish
+    """
+    try:
+        result = await notify_referrer_warning(
+            referrer_telegram_id, 
+            advanced_user_name, 
+            advanced_user_level, 
+            referrer_level
+        )
+        
+        if result['success']:
+            print(f"Warning notification sent successfully to referrer {referrer_telegram_id}")
+            return True
+        else:
+            print(f"Failed to send warning notification to referrer {referrer_telegram_id}: {result['error']}")
+            return False
+            
+    except Exception as e:
+        print(f"Error sending warning notification: {e}")
+        return False
+
+@sync_to_async
+def replace_referrer_by_admin(user_telegram_id: str, new_referrer_telegram_id: str, admin_telegram_id: str):
+    """
+    Admin tomonidan referrerni almashtirish
+    
+    Args:
+        user_telegram_id: Foydalanuvchi telegram ID
+        new_referrer_telegram_id: Yangi referrer telegram ID  
+        admin_telegram_id: Admin telegram ID
+    
+    Returns:
+        dict: Amaliyot natijasi
+    """
+    try:
+        # Foydalanuvchini topish
+        user = TelegramUser.objects.select_related('invited_by').filter(
+            telegram_id=user_telegram_id
+        ).first()
+        
+        if not user:
+            return {
+                'success': False,
+                'message': 'Foydalanuvchi topilmadi'
+            }
+        
+        # Yangi referrerni topish
+        new_referrer = TelegramUser.objects.filter(
+            telegram_id=new_referrer_telegram_id
+        ).first()
+        
+        if not new_referrer:
+            return {
+                'success': False,
+                'message': 'Yangi referrer topilmadi'
+            }
+        
+        # Adminni tekshirish
+        admin = TelegramUser.objects.filter(
+            telegram_id=admin_telegram_id,
+            is_admin=True
+        ).first()
+        
+        if not admin:
+            return {
+                'success': False,
+                'message': 'Admin huquqi yo\'q yoki admin topilmadi'
+            }
+        
+        # Yangi referrer darajasi foydalanuvchi darajasidan yuqori yoki teng ekanligini tekshirish
+        level_comparison = compare_levels(new_referrer.level, user.level)
+        if level_comparison < 0:
+            return {
+                'success': False,
+                'message': f'Yangi referrer darajasi ({new_referrer.level}) foydalanuvchi darajasidan ({user.level}) past'
+            }
+        
+        # Eski referrer ma'lumotlarini saqlash
+        old_referrer = user.invited_by
+        old_referrer_data = None
+        if old_referrer:
+            old_referrer_data = {
+                'telegram_id': old_referrer.telegram_id,
+                'full_name': old_referrer.full_name,
+                'level': old_referrer.level
+            }
+        
+        # Referrerni almashtirish
+        user.invited_by = new_referrer
+        user.save(update_fields=['invited_by'])
+        
+        # Yangi referrerning referral_count ni yangilash
+        new_referrer.update_referral_count()
+        
+        # Eski referrerning referral_count ni yangilash
+        if old_referrer:
+            old_referrer.update_referral_count()
+        
+        return {
+            'success': True,
+            'message': 'Referrer muvaffaqiyatli almashtirildi',
+            'old_referrer': old_referrer_data,
+            'new_referrer': {
+                'telegram_id': new_referrer.telegram_id,
+                'full_name': new_referrer.full_name,
+                'level': new_referrer.level
+            },
+            'user_data': {
+                'telegram_id': user.telegram_id,
+                'full_name': user.full_name,
+                'level': user.level
+            },
+            'admin': {
+                'telegram_id': admin.telegram_id,
+                'full_name': admin.full_name
+            }
+        }
+        
+    except Exception as e:
+        print(f"Error in replace_referrer_by_admin: {e}")
+        return {
+            'success': False,
+            'message': f'Xatolik yuz berdi: {str(e)}'
+        }
+
+async def send_referrer_replacement_notifications(replacement_result: dict):
+    """
+    Referrer almashtirish natijasida barcha tegishli xabarlarni yuborish
+    """
+    if not replacement_result['success']:
+        return {
+            'user_notified': False,
+            'new_referrer_notified': False,
+            'old_referrer_notified': False,
+            'error': 'Replacement was not successful'
+        }
+    
+    user_data = replacement_result['user_data']
+    new_referrer = replacement_result['new_referrer']
+    old_referrer = replacement_result.get('old_referrer')
+    admin = replacement_result['admin']
+    
+    notification_results = {
+        'user_notified': False,
+        'new_referrer_notified': False,
+        'old_referrer_notified': False
+    }
+    
+    try:
+        # 1. Foydalanuvchiga xabar yuborish
+        old_referrer_name = old_referrer['full_name'] if old_referrer else "Noma'lum"
+        user_result = await notify_referrer_changed(
+            user_data['telegram_id'],
+            old_referrer_name,
+            new_referrer['full_name'],
+            admin['full_name']
+        )
+        notification_results['user_notified'] = user_result['success']
+        
+        # 2. Yangi referrerga xabar yuborish
+        new_referrer_result = await notify_new_referral(
+            new_referrer['telegram_id'],
+            user_data['full_name'],
+            user_data['level'],
+            admin['full_name']
+        )
+        notification_results['new_referrer_notified'] = new_referrer_result['success']
+        
+        # 3. Eski referrerga xabar yuborish (agar mavjud bo'lsa)
+        if old_referrer:
+            old_referrer_result = await notify_referral_removed(
+                old_referrer['telegram_id'],
+                user_data['full_name'],
+                user_data['level'],
+                admin['full_name']
+            )
+            notification_results['old_referrer_notified'] = old_referrer_result['success']
+        else:
+            notification_results['old_referrer_notified'] = True  # Eski referrer yo'q
+            
+    except Exception as e:
+        print(f"Error sending referrer replacement notifications: {e}")
+        notification_results['error'] = str(e)
+    
+    return notification_results
+
+@sync_to_async
+def get_users_needing_referrer_replacement():
+    """
+    Referreri almashtirilishi kerak bo'lgan foydalanuvchilarni topish
+    """
+    try:
+        users_needing_replacement = []
+        
+        # Referer-i bor foydalanuvchilarni olish
+        users_with_referrers = TelegramUser.objects.select_related('invited_by').filter(
+            invited_by__isnull=False
+        )
+        
+        for user in users_with_referrers:
+            referrer = user.invited_by
+            level_comparison = compare_levels(user.level, referrer.level)
+            
+            if level_comparison > 0:  # User darajasi referrerdan yuqori
+                users_needing_replacement.append({
+                    'user': {
+                        'telegram_id': user.telegram_id,
+                        'full_name': user.full_name,
+                        'level': user.level
+                    },
+                    'current_referrer': {
+                        'telegram_id': referrer.telegram_id,
+                        'full_name': referrer.full_name,
+                        'level': referrer.level
+                    }
+                })
+        
+        return {
+            'success': True,
+            'count': len(users_needing_replacement),
+            'users': users_needing_replacement
+        }
+        
+    except Exception as e:
+        print(f"Error in get_users_needing_referrer_replacement: {e}")
+        return {
+            'success': False,
+            'count': 0,
+            'users': [],
+            'error': str(e)
+        }
+
+@sync_to_async
+def find_suitable_referrers_for_user(user_telegram_id: str, limit: int = 10):
+    """
+    Foydalanuvchi uchun mos referrerlarni topish
+    (Daraja bir xil yoki yuqori bo'lgan foydalanuvchilar)
+    """
+    try:
+        user = TelegramUser.objects.filter(telegram_id=user_telegram_id).first()
+        if not user:
+            return {
+                'success': False,
+                'suitable_referrers': [],
+                'message': 'Foydalanuvchi topilmadi'
+            }
+        
+        # Foydalanuvchi darajasidan yuqori yoki teng darajadagi foydalanuvchilarni topish
+        user_level_num = 0
+        try:
+            if user.level.startswith('level_'):
+                user_level_num = int(user.level.split('_')[1])
+            elif '-bosqich' in user.level:
+                user_level_num = int(user.level.split('-')[0])
+        except (ValueError, IndexError):
+            user_level_num = 0
+        
+        suitable_referrers = []
+        
+        # Barcha foydalanuvchilarni tekshirish
+        all_users = TelegramUser.objects.exclude(telegram_id=user_telegram_id).filter(
+            is_confirmed=True
+        )[:100]  # Performance uchun limit
+        
+        for potential_referrer in all_users:
+            referrer_level_num = 0
+            try:
+                if potential_referrer.level.startswith('level_'):
+                    referrer_level_num = int(potential_referrer.level.split('_')[1])
+                elif '-bosqich' in potential_referrer.level:
+                    referrer_level_num = int(potential_referrer.level.split('-')[0])
+            except (ValueError, IndexError):
+                referrer_level_num = 0
+            
+            # Agar potential referrer darajasi user darajasidan yuqori yoki teng bo'lsa
+            if referrer_level_num >= user_level_num:
+                suitable_referrers.append({
+                    'telegram_id': potential_referrer.telegram_id,
+                    'full_name': potential_referrer.full_name,
+                    'level': potential_referrer.level,
+                    'level_number': referrer_level_num,
+                    'referral_count': potential_referrer.referral_count,
+                    'telegram_username': potential_referrer.telegram_username
+                })
+        
+        # Darajaga ko'ra saralash (yuqori darajalilar birinchi)
+        suitable_referrers.sort(key=lambda x: (-x['level_number'], -x['referral_count']))
+        
+        return {
+            'success': True,
+            'suitable_referrers': suitable_referrers[:limit],
+            'total_found': len(suitable_referrers),
+            'user_level': user.level
+        }
+        
+    except Exception as e:
+        print(f"Error in find_suitable_referrers_for_user: {e}")
+        return {
+            'success': False,
+            'suitable_referrers': [],
+            'message': f'Xatolik: {str(e)}'
+        }
+
+# Asosiy workflow funksiyalari
+
+async def handle_user_level_advancement_workflow(user_telegram_id: str):
+    """
+    Foydalanuvchi darajasi oshganda to'liq workflow ni bajarish
+    
+    1. Referrer darajasini tekshirish
+    2. Agar kerak bo'lsa ogohlantirish yuborish
+    3. Natijani qaytarish
+    """
+    try:
+        # 1. Darajani tekshirish
+        check_result = await check_and_handle_referrer_level_advancement(user_telegram_id)
+        
+        if not check_result['needs_replacement']:
+            return check_result
+        
+        # 2. Referrerga ogohlantirish yuborish
+        referrer_data = check_result['current_referrer']
+        user_data = check_result['user_data']
+        
+        warning_sent = await send_referrer_warning_notification(
+            referrer_data['telegram_id'],
+            user_data['full_name'],
+            user_data['level'],
+            referrer_data['level']
+        )
+        
+        check_result['notification_sent'] = warning_sent
+        
+        if warning_sent:
+            check_result['message'] += " Referrerga ogohlantirish yuborildi."
+        else:
+            check_result['message'] += " Referrerga ogohlantirish yuborishda xatolik."
+        
+        return check_result
+        
+    except Exception as e:
+        print(f"Error in handle_user_level_advancement_workflow: {e}")
+        return {
+            'needs_replacement': False,
+            'current_referrer': None,
+            'notification_sent': False,
+            'message': f'Workflow xatoligi: {str(e)}'
+        }
+
+async def complete_referrer_replacement_workflow(user_telegram_id: str, new_referrer_telegram_id: str, admin_telegram_id: str):
+    """
+    To'liq referrer almashtirish workflow ni bajarish
+    
+    1. Referrerni almashtirish
+    2. Barcha tegishli xabarlarni yuborish
+    3. Natijani qaytarish
+    """
+    try:
+        # 1. Referrerni almashtirish
+        replacement_result = await replace_referrer_by_admin(
+            user_telegram_id, 
+            new_referrer_telegram_id, 
+            admin_telegram_id
+        )
+        
+        if not replacement_result['success']:
+            return {
+                'replacement_success': False,
+                'notifications_sent': False,
+                'message': replacement_result['message']
+            }
+        
+        # 2. Xabarlarni yuborish
+        notification_results = await send_referrer_replacement_notifications(replacement_result)
+        
+        return {
+            'replacement_success': True,
+            'notifications_sent': True,
+            'notification_details': notification_results,
+            'replacement_data': replacement_result,
+            'message': 'Referrer muvaffaqiyatli almashtirildi va barcha xabarlar yuborildi'
+        }
+        
+    except Exception as e:
+        print(f"Error in complete_referrer_replacement_workflow: {e}")
+        return {
+            'replacement_success': False,
+            'notifications_sent': False,
+            'message': f'Workflow xatoligi: {str(e)}'
+        }
+
+# Utility funksiyalar
+
+async def bulk_check_referrer_levels():
+    """
+    Barcha foydalanuvchilarning referrer darajalarini tekshirish
+    """
+    try:
+        users_needing_replacement = await get_users_needing_referrer_replacement()
+        
+        if not users_needing_replacement['success']:
+            return users_needing_replacement
+        
+        warning_results = []
+        
+        for user_info in users_needing_replacement['users']:
+            user_data = user_info['user']
+            referrer_data = user_info['current_referrer']
+            
+            # Har bir referrerga ogohlantirish yuborish
+            warning_sent = await send_referrer_warning_notification(
+                referrer_data['telegram_id'],
+                user_data['full_name'],
+                user_data['level'],
+                referrer_data['level']
+            )
+            
+            warning_results.append({
+                'user': user_data,
+                'referrer': referrer_data,
+                'warning_sent': warning_sent
+            })
+        
+        return {
+            'success': True,
+            'total_users_checked': users_needing_replacement['count'],
+            'warning_results': warning_results
+        }
+        
+    except Exception as e:
+        print(f"Error in bulk_check_referrer_levels: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+async def get_referrer_replacement_statistics():
+    """
+    Referrer almashtirish statistikasini olish
+    """
+    try:
+        users_needing_replacement = await get_users_needing_referrer_replacement()
+        
+        if not users_needing_replacement['success']:
+            return users_needing_replacement
+        
+        stats = {
+            'total_users_needing_replacement': users_needing_replacement['count'],
+            'users_by_level': {},
+            'referrers_by_level': {}
+        }
+        
+        for user_info in users_needing_replacement['users']:
+            user_level = user_info['user']['level']
+            referrer_level = user_info['current_referrer']['level']
+            
+            # Foydalanuvchilar darajasi bo'yicha
+            if user_level not in stats['users_by_level']:
+                stats['users_by_level'][user_level] = 0
+            stats['users_by_level'][user_level] += 1
+            
+            # Referrerlar darajasi bo'yicha
+            if referrer_level not in stats['referrers_by_level']:
+                stats['referrers_by_level'][referrer_level] = 0
+            stats['referrers_by_level'][referrer_level] += 1
+        
+        return {
+            'success': True,
+            'statistics': stats,
+            'detailed_users': users_needing_replacement['users']
+        }
+        
+    except Exception as e:
+        print(f"Error in get_referrer_replacement_statistics: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }

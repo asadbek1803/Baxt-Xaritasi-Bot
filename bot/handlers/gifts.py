@@ -1,5 +1,6 @@
 from aiogram import Router, F, types
 from bot.selectors import get_gifts_is_active
+from bot.buttons.default.back import get_back_keyboard
 
 router = Router()
 
@@ -23,7 +24,9 @@ async def gifts_handler(message: types.Message):
         await message.answer_photo(
             photo=types.FSInputFile(file_path),
             caption=gifts_text,
+            reply_markup=get_back_keyboard(),
             parse_mode="HTML"
         )
     else:
-        await message.answer(gifts_text, parse_mode="HTML")
+        await message.answer(gifts_text, parse_mode="HTML",
+                             reply_markup=get_back_keyboard())

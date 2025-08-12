@@ -406,6 +406,7 @@ class Payments(models.Model):
         self.is_confirmed = True
         self.confirmed_date = timezone.now()
         
+        # *** YANGI QO'SHILDI: To'lov qabul qilingandan so'ng referrer darajasini tekshirish ***
         
         # Foydalanuvchi darajasini yangilash
         levels = list(LEVEL_CHOICES)

@@ -1,4 +1,5 @@
 from aiogram import types, F, Router
+from bot.buttons.default.back import get_back_keyboard
 
 router = Router()
 
@@ -11,5 +12,6 @@ async def contact_handler(message: types.Message):
         "📍 <b>Manzil:</b> Toshkent sh., Example ko'chasi, 123-uy\n"
         "🌐 <b>Telegram:</b> @example_support\n"
         "⏰ <b>Ish vaqti:</b> 09:00 - 18:00",
+        reply_markup=get_back_keyboard(),
         parse_mode="HTML"
     )

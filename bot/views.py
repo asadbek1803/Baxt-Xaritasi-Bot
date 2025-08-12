@@ -22,8 +22,7 @@ dp = Dispatcher()
 from bot.middlewares.throttling import ThrottlingMiddleware
 from bot.middlewares.check_subscribe import ChannelMembershipMiddleware
 
-# Middlewareni to'g'ridan-to'g'ri ulash
-dp.message.middleware(ThrottlingMiddleware(slow_mode_delay=0.5))
+
 dp.callback_query.middleware(ChannelMembershipMiddleware(bot=bot, skip_admins=True))
 dp.message.middleware(ChannelMembershipMiddleware(bot=bot, skip_admins=True))
 

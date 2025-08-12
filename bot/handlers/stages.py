@@ -139,53 +139,75 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
         
         if course:
             text = f"""
-🎯 <b>{level_name} bosqichi</b>
+                🎯 <b>{level_name} bosqichi</b>
 
-Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
+                Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
 
-📚 <b>{course.name}</b>
-💰 Narxi: {course.price:,} so'm
-📖 Ta'rif: {course.description}
+                📚 <b>{course.name}</b>
+                💰 Narxi: {course.price:,} so'm
+                📖 Ta'rif: {course.description}
 
-Kursni sotib olishni xohlaysizmi?
-            """
-            
-
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="💳 Sotib olish",
-                        callback_data=f"buy_course_{course.id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="◀️ Orqaga",
-                        callback_data="back_to_stages"
-                    )
-                ]
-            ])
+                Kursni sotib olishni xohlaysizmi?
+                            """
             if user.is_confirmed == False:
-                keyboard.inline_keyboard.append(
-                [
-                    InlineKeyboardButton(
-                        text="📢 Referral yaratish",
-                        callback_data=f"create_referral_{course.id}"
+                text += "\n\n💡 <b>Referral yaratish orqali ham kurs sotib olishingiz mumkin!</b>"
+                
+                refferal_button = InlineKeyboardButton(
+                    text="📢 Referral yaratish",
+                    callback_data=f"create_referral_{course.id}"
+                )
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [refferal_button]
+                ])
+                
+                await callback.answer(
+                    "💡 Referral yaratish orqali ham kurs sotib olishingiz mumkin!", 
+                    show_alert=True
+                )
+                
+                await callback.message.answer(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
+                )
+            else:
+
+                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="💳 Sotib olish",
+                                callback_data=f"buy_course_{course.id}"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                text="◀️ Orqaga",
+                                callback_data="back_to_stages"
+                            )
+                        ]
+                    ])
+                    if user.is_confirmed == False:
+                        keyboard.inline_keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                text="📢 Referral yaratish",
+                                callback_data=f"create_referral_{course.id}"
+                            )
+                        ]
                     )
-                ]
-            )
-            
-            await callback.message.edit_text(
-                text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
+                    
+                    await callback.message.edit_text(
+                        text,
+                        reply_markup=keyboard,
+                        parse_mode="HTML"
+                    )
         else:
-            await callback.answer(
-                f"❌ {level_name} uchun kurs topilmadi",
-                show_alert=True
-            )
-        
+                    await callback.answer(
+                        f"❌ {level_name} uchun kurs topilmadi",
+                        show_alert=True
+                    )
+            
     elif stage_type == "next":
         # Keyingi bosqich - kurs sotib olishni taklif qilish
         previous_level = f"{level_num-1}-bosqich"
@@ -193,45 +215,67 @@ Kursni sotib olishni xohlaysizmi?
         
         if course:
             text = f"""
-🎯 <b>{level_name} bosqichi</b>
+            🎯 <b>{level_name} bosqichi</b>
 
-Bu bosqichga o'tish uchun quyidagi kursni sotib olishingiz kerak:
+            Bu bosqichga o'tish uchun quyidagi kursni sotib olishingiz kerak:
 
-📚 <b>{course.name}</b>
-💰 Narxi: {course.price:,} so'm
-📖 Ta'rif: {course.description}
+            📚 <b>{course.name}</b>
+            💰 Narxi: {course.price:,} so'm
+            📖 Ta'rif: {course.description}
 
-Kursni sotib olishni xohlaysizmi?
-            """
-            
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="💳 Sotib olish",
-                        callback_data=f"buy_course_{course.id}"
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text="◀️ Orqaga",
-                        callback_data="back_to_stages"
-                    )
-                ]
-            ])
+            Kursni sotib olishni xohlaysizmi?
+                        """
             if user.is_confirmed == False:
-                keyboard.inline_keyboard.append(
+                text += "\n\n💡 <b>Referral yaratish orqali ham kurs sotib olishingiz mumkin!</b>"
+                
+                refferal_button = InlineKeyboardButton(
+                    text="📢 Referral yaratish",
+                    callback_data=f"create_referral_{course.id}"
+                )
+                
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                    [refferal_button]
+                ])
+                
+                await callback.answer(
+                    "💡 Referral yaratish orqali ham kurs sotib olishingiz mumkin!", 
+                    show_alert=True
+                )
+                
+                await callback.message.answer(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
+                )
+            else:
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="📢 Referral yaratish",
-                            callback_data=f"create_referral_{course.id}"
+                            text="💳 Sotib olish",
+                            callback_data=f"buy_course_{course.id}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="◀️ Orqaga",
+                            callback_data="back_to_stages"
                         )
                     ]
+                ])
+                if user.is_confirmed == False:
+                    keyboard.inline_keyboard.append(
+                        [
+                            InlineKeyboardButton(
+                                text="📢 Referral yaratish",
+                                callback_data=f"create_referral_{course.id}"
+                            )
+                        ]
+                    )
+                await callback.message.edit_text(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
                 )
-            await callback.message.edit_text(
-                text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
         else:
             await callback.answer(
                 f"❌ {level_name} uchun kurs topilmadi",

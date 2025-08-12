@@ -1,6 +1,7 @@
 from aiogram import Router, Bot, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.utils.markdown import hbold
 
 from bot.selectors import (
     get_all_channels,
@@ -12,23 +13,14 @@ from bot.selectors import (
 from bot.constants import Messages
 from bot.buttons.default.menu import get_menu_keyboard
 import logging
-import html
+from typing import List
 
 router = Router()
 
-@router.callback_query(F.data == "check_subscription")
-async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
-    user_id = callback.from_user.id
-    await callback.answer("⏳ A'zolik tekshirilmoqda...")
-
-    try:
-        channels = await get_all_channels()
-    except Exception as e:
-        logging.error(f"Kanallarni olishda xatolik: {e}")
-        return await callback.answer("❌ Xatolik yuz berdi. Qayta urinib ko'ring!", show_alert=True)
-
+async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> List:
+    """Check user subscriptions to all channels and return unsubscribed ones"""
     not_subscribed = []
-
+    
     for channel in channels:
         if not getattr(channel, "telegram_id", None):
             not_subscribed.append(channel)
@@ -38,58 +30,118 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
             member = await bot.get_chat_member(channel.telegram_id, user_id)
             if member.status in ["left", "kicked"]:
                 not_subscribed.append(channel)
-
         except (TelegramBadRequest, TelegramForbiddenError) as e:
-            logging.error(f"Bot {channel.name} kanalida ishlay olmaydi: {e}")
+            logging.error(f"Bot can't operate in channel {channel.name}: {e}")
             not_subscribed.append(channel)
         except Exception as e:
-            logging.error(f"A'zolik tekshiruv xatosi: {e}")
+            logging.error(f"Subscription check error: {e}")
             not_subscribed.append(channel)
+    
+    return not_subscribed
 
-    if not not_subscribed:
-        user = await get_user(user_id)
-        user_level = await get_user_level(telegram_id=user_id)
+async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
+    """Handle flow for new users (level 0)"""
+    user = await get_user(user_id)
+    user_level = await get_user_level(telegram_id=user_id)
+    
+    if await get_user_buy_course(telegram_id=user_id):
+        await callback.message.delete()  # Clear previous message
+        return await callback.message.answer(
+            text=Messages.welcome_message.value.format(full_name=hbold(user.full_name)),
+            reply_markup=get_menu_keyboard()
+        )
+    
+    course = await get_level_kurs(level=user_level)
+    if not course:
+        await callback.message.delete()
+        return await callback.message.answer(
+            text="⚠️ Hozircha sizga mos kurs topilmadi. Iltimos, keyinroq urinib ko'ring.",
+            reply_markup=get_menu_keyboard()
+        )
+    
+    text = (
+        f"🎓 {hbold(course.name)}\n\n"
+        f"{course.description}\n\n"
+        f"💵 Narxi: {hbold(f'{course.price} so\'m')}"
+    )
+    
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🛒 Sotib olish",
+                    callback_data=f"buy_course_{course.id}"
+                ),
+                InlineKeyboardButton(
+                    text="📢 Referralimni yaratish",
+                    callback_data=f"create_referral_{course.id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔄 A'zolikni tekshirish",
+                    callback_data="check_subscription"
+                )
+            ]
+        ]
+    )
+    
+    await callback.message.edit_text(
+        text=text, 
+        reply_markup=keyboard
+    )
 
-        # Agar foydalanuvchi 1-bosqich bo'lsa
-        if user_level == "0-bosqich":
-            if await get_user_buy_course(telegram_id=user_id):
-                return await callback.message.answer(
-                    text=Messages.welcome_message.value.format(full_name=user.full_name),
-                    reply_markup=get_menu_keyboard()
-                )
-            
-            # Levelga mos kursni olish
-            course = await get_level_kurs(level=user_level)
-            if course:
-                text = (
-                    f"🎓 <b>{course.name}</b>\n\n"
-                    f"{course.description}\n\n"
-                    f"💵 Narxi: <b>{course.price} so'm</b>"
-                )
-                keyboard = InlineKeyboardMarkup(
-                    inline_keyboard=[[
-                        InlineKeyboardButton(
-                            text="🛒 Sotib olish",
-                            callback_data=f"buy_course_{course.id}"
-                        ),
-                        InlineKeyboardButton(
-                            text = "📢 Referralimni yaratish",
-                            callback_data=f"create_referral_{course.id}"
-                        )
-                    ]]
-                )
-                return await callback.message.answer(
-                    text=text, parse_mode="HTML", reply_markup=keyboard
-                )
-        else:
-            # 1-bosqich bo'lmagan foydalanuvchi uchun menyu
+@router.callback_query(F.data == "check_subscription")
+async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
+    user_id = callback.from_user.id
+    
+    # Show checking status
+    checking_msg = await callback.message.answer("🔍 A'zolik holati tekshirilmoqda...")
+    
+    try:
+        channels = await get_all_channels()
+        if not channels:
+            await checking_msg.delete()
             return await callback.message.answer(
-                text=Messages.welcome_message.value.format(full_name=user.full_name),
+                "ℹ️ Hozircha a'zo bo'lish uchun kanallar mavjud emas.",
                 reply_markup=get_menu_keyboard()
             )
-    else:
-        channels_str = ", ".join(html.escape(ch.name or "Kanal") for ch in not_subscribed)
-        await callback.answer(
-            f"❌ Quyidagi kanallarga hali a'zo bo'lmadingiz: {channels_str}",
-            show_alert=True
+        
+        not_subscribed = await check_user_subscriptions(bot, user_id, channels)
+        
+        if not_subscribed:
+            channels_list = "\n".join(
+                f"➖ {channel.name}" 
+                for channel in not_subscribed 
+                if channel.name
+            )
+            
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="🔄 A'zolikni tekshirish",
+                            callback_data="check_subscription"
+                        )
+                    ]
+                ]
+            )
+            
+            await checking_msg.delete()
+            await callback.message.answer(
+                f"❗️ Quyidagi kanal(lar)ga a'zo bo'lishingiz kerak:\n\n"
+                f"{channels_list}\n\n"
+                f"A'zo bo'lgach, «🔄 A'zolikni tekshirish» tugmasini bosing.",
+                reply_markup=keyboard
+            )
+        else:
+            await checking_msg.delete()
+            await handle_new_user_flow(callback, user_id)
+            
+    except Exception as e:
+        logging.error(f"Subscription check error: {e}")
+        await checking_msg.delete()
+        await callback.message.answer(
+            "⚠️ A'zolikni tekshirishda xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
+            reply_markup=get_menu_keyboard()
         )

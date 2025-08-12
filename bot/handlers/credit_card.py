@@ -6,6 +6,7 @@ from bot.handlers.my_profile import my_profile_handler
 from bot.selectors import fetch_user, update_user_card_info
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from bot.buttons.default.back import get_back_keyboard
 router = Router()
 
 class CardInfoStates(StatesGroup):
@@ -68,6 +69,7 @@ async def show_card_info(callback: types.CallbackQuery):
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
         )
+        
         
     except Exception as e:
         print(f"Error showing card info: {e}")

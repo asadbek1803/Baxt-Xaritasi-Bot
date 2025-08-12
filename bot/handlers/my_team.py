@@ -11,6 +11,7 @@ from bot.selectors import (
     get_monthly_referrals_count
 )
 import math
+from bot.buttons.default.back import get_back_keyboard
 
 router = Router()
 
@@ -43,7 +44,8 @@ async def my_team_handler(message: types.Message):
             "• Mukofotlar oling!\n\n"
             "💡 <b>Referal havolangizni olish uchun:</b>\n"
             "🔗 Referal havola tugmasini bosing",
-            parse_mode="HTML"
+            parse_mode="HTML",
+            reply_markup=get_back_keyboard()
         )
         return
     

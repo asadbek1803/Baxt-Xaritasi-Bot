@@ -8,8 +8,10 @@ from bot.selectors import (
     get_course_for_next_level_by_user_level,
     get_referral_link_for_user
 )
+from bot.buttons.default.back import get_back_keyboard
 
 router = Router()
+
 
 
 def format_user_level(level: str) -> str:
@@ -121,18 +123,25 @@ async def my_profile_handler(message: types.Message, bot: Bot):
             try:
                 course = await get_course_for_next_level_by_user_level(user_data.get('level'))
                 if course:
+                    if user_data.get('is_confirmed') == False:
+                        builder.row(
+                            types.InlineKeyboardButton(
+                                text="📢 Referral yaratish",
+                                callback_data=f"create_referral_{course['id']}"
+                            )
+                        )
+                        profile_info += (
+                            f"\n\n<b>⚠️ Darajani oshirish uchun ⚠️ </b>\n"
+                            f"1. Referral yaratish: <b>{course['referral_name']}</b>"
+                        )
+
                     builder.row(
                         types.InlineKeyboardButton(
                             text="🛒 Kurs sotib olish",
                             callback_data=f"buy_course_{course['id']}"
                         )
                     )
-                    builder.row(
-                        types.InlineKeyboardButton(
-                            text="📢 Referral yaratish",
-                            callback_data=f"create_referral_{course['id']}"
-                        )
-                    )
+
             except Exception as e:
                 print(f"[my_profile_handler] Error getting course for buttons: {e}")
 
@@ -144,10 +153,17 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                     reply_markup=builder.as_markup(),
                     parse_mode="HTML"
                 )
+                await bot.send_message(
+                    chat_id=user_id,
+                    text = " 👤 Mening hisobim",
+                    reply_markup=get_back_keyboard(),
+                    parse_mode="HTML"
+                )
             else:
                 await message.answer(
                     text=profile_info,
-                    parse_mode="HTML"
+                    parse_mode="HTML",
+                    reply_markup=get_back_keyboard(),
                 )
         except Exception as e:
             print(f"[my_profile_handler] Send message error: {e}")
