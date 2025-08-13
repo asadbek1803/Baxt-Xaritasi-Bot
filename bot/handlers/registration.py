@@ -19,17 +19,71 @@ from bot.services.subscribe import check_channels_after_registration
 router = Router()
 
 
+# 1. Foydalanuvchi to‘liq ism kiritadi
 @router.message(UserRegistrationState.GET_FULL_NAME)
 async def get_full_name(message: types.Message, state: FSMContext):
     full_name = message.text.strip()
     if not (3 <= len(full_name) <= 100):
         await message.answer(Messages.full_name_error.value)
         return
+
     await state.update_data(full_name=full_name)
+
+    # ✅ Karta raqamini so‘rash
+    await message.answer(
+        "💳 <b>Plastik karta raqamini kiriting</b>\n\n"
+        "📝 16 raqamli karta raqamingizni kiriting:\n"
+        "Masalan: <code>1234567812345678</code>\n\n"
+        "❌ Bekor qilish uchun /cancel yozing",
+        parse_mode="HTML"
+    )
+    await state.set_state(UserRegistrationState.GET_CARD_NUMBER)
+
+
+# 2. Karta raqamini olish
+@router.message(UserRegistrationState.GET_CARD_NUMBER)
+async def process_card_number(message: types.Message, state: FSMContext):
+    card_number = message.text.strip().replace(" ", "").replace("-", "")
+
+    if not card_number.isdigit():
+        await message.answer("❌ Karta raqami faqat raqamlardan iborat bo‘lishi kerak.")
+        return
+    if len(card_number) != 16:
+        await message.answer("❌ Karta raqami 16 ta raqamdan iborat bo‘lishi kerak.")
+        return
+
+    await state.update_data(card_number=card_number)
+
+    masked_card = "*" * 12 + card_number[-4:]
+    await message.answer(
+        f"✅ Karta raqami qabul qilindi: <code>{masked_card}</code>\n\n"
+        f"👤 Endi karta egasining to‘liq ismini kiriting:\n"
+        f"Masalan: <code>ABDULLAYEV AZAMAT AKMAL O'G'LI</code>",
+        parse_mode="HTML"
+    )
+    await state.set_state(UserRegistrationState.GET_CARD_HOLDER_NAME)
+
+
+# 3. Karta egasi ismini olish
+@router.message(UserRegistrationState.GET_CARD_HOLDER_NAME)
+async def process_card_holder_name(message: types.Message, state: FSMContext):
+    card_holder_name = message.text.strip().upper()
+
+    if len(card_holder_name) < 2:
+        await message.answer("❌ Ism juda qisqa, to‘liq kiriting.")
+        return
+    if len(card_holder_name) > 200:
+        await message.answer("❌ Ism juda uzun.")
+        return
+
+    await state.update_data(card_holder_name=card_holder_name)
+
+    # ✅ Endi yoshni so‘rash
     await message.answer("Yoshingizni tanlang:", reply_markup=get_age_button())
     await state.set_state(UserRegistrationState.GET_AGE)
 
 
+# 4. Yoshni olish
 @router.callback_query(UserRegistrationState.GET_AGE, F.data.startswith("age_"))
 async def process_age_callback(callback: types.CallbackQuery, state: FSMContext):
     age_map = {"18_24": "18-24", "25_34": "25-34", "35_44": "35-44", "45_plus": "45+"}
@@ -40,19 +94,17 @@ async def process_age_callback(callback: types.CallbackQuery, state: FSMContext)
 
     await state.update_data(age=age_value)
 
-    # Inline keyboard-ni olib tashlash uchun reply_markup=None ishlatamiz
     try:
         await callback.message.edit_text(
             f"✅ Yosh: <b>{age_value}</b>",
             parse_mode="HTML",
-            reply_markup=None,  # Bu inline keyboard-ni olib tashlaydi
+            reply_markup=None
         )
     except Exception as e:
-        # Agar edit_text ishlamasa, yangi xabar yuboramiz
-        logging.warning(f"Edit text failed, sending new message: {e}")
+        logging.warning(f"Edit text failed: {e}")
         await callback.message.answer(f"✅ Yosh: <b>{age_value}</b>", parse_mode="HTML")
 
-    await callback.answer()  # Callback query-ni javoblash
+    await callback.answer()
     await callback.message.answer(
         Messages.ask_phone_number.value,
         reply_markup=get_phone_keyboard(text=Button.send_phone_number.value),
@@ -60,6 +112,7 @@ async def process_age_callback(callback: types.CallbackQuery, state: FSMContext)
     await state.set_state(UserRegistrationState.GET_PHONE_NUMBER)
 
 
+# 5. Telefon raqamini olish (contact)
 @router.message(UserRegistrationState.GET_PHONE_NUMBER, F.contact)
 async def get_phone_contact(message: types.Message, state: FSMContext):
     phone_number = message.contact.phone_number
@@ -70,6 +123,7 @@ async def get_phone_contact(message: types.Message, state: FSMContext):
     await state.set_state(UserRegistrationState.GET_REGION)
 
 
+# 6. Telefon raqamini olish (matn)
 @router.message(UserRegistrationState.GET_PHONE_NUMBER, F.text)
 async def get_phone_text(message: types.Message, state: FSMContext):
     phone_number = format_phone_number(message.text.strip())
@@ -84,6 +138,7 @@ async def get_phone_text(message: types.Message, state: FSMContext):
     await state.set_state(UserRegistrationState.GET_REGION)
 
 
+# 7. Region tanlash
 @router.callback_query(UserRegistrationState.GET_REGION, F.data.startswith("region_"))
 async def process_region_callback(callback: types.CallbackQuery, state: FSMContext):
     region_code = callback.data.split("_", 1)[1]
@@ -94,16 +149,13 @@ async def process_region_callback(callback: types.CallbackQuery, state: FSMConte
 
     await state.update_data(region=region_name)
 
-    # Inline keyboard-ni olib tashlash
     try:
         await callback.message.edit_text(
-            Messages.select_region_success.value.format(
-                region=region_name
-            ),
+            Messages.select_region_success.value.format(region=region_name),
             reply_markup=None,
         )
     except Exception as e:
-        logging.warning(f"Edit text failed, sending new message: {e}")
+        logging.warning(f"Edit text failed: {e}")
         await callback.message.answer(
             Messages.select_region_success.value.format(region=region_name)
         )
@@ -115,9 +167,8 @@ async def process_region_callback(callback: types.CallbackQuery, state: FSMConte
     await state.set_state(UserRegistrationState.GET_PROFESSION)
 
 
-@router.callback_query(
-    UserRegistrationState.GET_PROFESSION, F.data.startswith("profession_")
-)
+# 8. Kasb tanlash
+@router.callback_query(UserRegistrationState.GET_PROFESSION, F.data.startswith("profession_"))
 async def process_profession_callback(callback: types.CallbackQuery, state: FSMContext):
     profession_code = callback.data.split("_", 1)[1]
     profession_name = next(
@@ -129,20 +180,15 @@ async def process_profession_callback(callback: types.CallbackQuery, state: FSMC
 
     await state.update_data(profession=profession_name)
 
-    # Inline keyboard-ni olib tashlash
     try:
         await callback.message.edit_text(
-            Messages.select_profession_success.value.format(
-                profession=profession_name
-            ),
+            Messages.select_profession_success.value.format(profession=profession_name),
             reply_markup=None,
         )
     except Exception as e:
-        logging.warning(f"Edit text failed, sending new message: {e}")
+        logging.warning(f"Edit text failed: {e}")
         await callback.message.answer(
-            Messages.select_profession_success.value.format(
-                profession=profession_name
-            )
+            Messages.select_profession_success.value.format(profession=profession_name)
         )
 
     await callback.answer()
@@ -152,6 +198,7 @@ async def process_profession_callback(callback: types.CallbackQuery, state: FSMC
     await state.set_state(UserRegistrationState.GET_GENDER)
 
 
+# 9. Jins tanlash va foydalanuvchini yaratish
 @router.message(UserRegistrationState.GET_GENDER)
 async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
     gender_name = message.text.strip().title()
@@ -164,20 +211,12 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
 
     data = await state.get_data()
 
-    # Referral ma'lumotlarini olish
     referral_code = data.get("referral_code", None)
     invited_by_user = None
 
-    # Agar referral code mavjud bo'lsa, taklif qiluvchi foydalanuvchini topamiz
     if referral_code:
         try:
             invited_by_user = await get_user_by_referral_code(referral_code)
-            if invited_by_user:
-                logging.info(
-                    f"Found referrer: {invited_by_user.full_name} for code: {referral_code}"
-                )
-            else:
-                logging.warning(f"Referrer not found for code: {referral_code}")
         except Exception as e:
             logging.error(f"Error finding referrer: {e}")
 
@@ -190,30 +229,26 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
             profession=data["profession"],
             region=get_region_code_by_name(data["region"]),
             gender=gender_code,
-            referral_code=None,  # Bu avtomatik yaratiladi
-            invited_by=invited_by_user,  # To'g'ri parametr nomi
+            referral_code=None,
+            invited_by=invited_by_user,
             level="0-bosqich",
             age=data.get("age"),
             card_number=data.get("card_number"),
             card_holder_name=data.get("card_holder_name"),
         )
 
-        if user is None:
-            logging.error(
-                f"Failed to create user for telegram_id: {message.from_user.id}"
-            )
+        if not user:
             await message.answer(Messages.system_error.value)
             return
 
-        # Referral xabari
         referral_message = ""
         if invited_by_user:
-            referral_message = (
-                f"\n\n🎉 Siz {invited_by_user.full_name} tomonidan taklif qilindingiz!"
-            )
+            referral_message = f"\n\n🎉 Siz {invited_by_user.full_name} tomonidan taklif qilindingiz!"
+
         user_level = await get_user_level(telegram_id=message.from_user.id)
         course = await get_course_by_user_level(user_level)
         price_formatted = "{:,}".format(course.price)
+
         await message.answer(
             Messages.welcome_message_for_registration.value.format(price_formatted) + referral_message,
             parse_mode="HTML",

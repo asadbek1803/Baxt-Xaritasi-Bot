@@ -58,7 +58,7 @@ class TelegramUser(models.Model):
         verbose_name="Karta egasining to'liq ismi"
     )
 
-    # Joylashuv va shaxsiy ma'lumotlar
+    # Joylashuv va shaxsiy ma'lumo tlar
     region = models.CharField(
         max_length=50, choices=REGIONS,
         help_text="Foydalanuvchining yashash joyi",
