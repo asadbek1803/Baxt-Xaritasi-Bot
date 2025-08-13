@@ -8,7 +8,7 @@ from django.utils import timezone
 from .models import (
     TelegramUser, Payments, 
     MandatoryChannel, PrivateChannel, Notification,
-    Kurslar, CourseParticipant, Gifts
+    Kurslar, CourseParticipant, Gifts, ReferrerUpdateQueue
 )
 
 # PrivateChannel Inline - Konkurs ichida qo'shish uchun
@@ -517,8 +517,35 @@ class GiftsAdmin(ModelAdmin):
             return False
         return super().has_add_permission(request)
 
-    list_display = ('name', 'description')
+    list_display = ('name', 'description', 'created_at', 'updated_at')
+    search_fields = ('name', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ('-created_at',)
 
+@admin.register(ReferrerUpdateQueue)
+class ReferrerUpdateQueueAdmin(ModelAdmin):
+    list_display = ('get_user_name', 'get_referrer_name', 'status', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('user__full_name', 'referrer__full_name')
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)
+
+    def get_user_name(self, obj):
+        return obj.user.full_name if obj.user else '-'
+    get_user_name.short_description = 'User'
+
+    def get_referrer_name(self, obj):
+        return obj.referrer.full_name if obj.referrer else '-'
+    get_referrer_name.short_description = 'Referrer'
+
+    fieldsets = (
+        ('Asosiy Ma\'lumotlar', {
+            'fields': ('status',)
+        }),
+        ('Vaqt', {
+            'fields': ('created_at',)
+        }),
+    )
 
 # Admin panelni sozlash
 admin.site.site_header = "Konkurs Bot Boshqaruvi"

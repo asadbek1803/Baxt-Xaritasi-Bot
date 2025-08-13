@@ -399,39 +399,84 @@ def check_user_can_access_level(telegram_id: str, target_level: str):
     except Exception as e:
         print(f"Error checking user access level: {e}")
         return False
-@sync_to_async
-def get_root_referrer(user_id: str):
-    """Foydalanuvchining eng yuqori (root) referrerini topish"""
-    user = TelegramUser.objects.filter(telegram_id=user_id).first()
-    if not user or not user.invited_by:
-        return None
-    
-    current = user
-    while current.invited_by:
-        current = current.invited_by
-    
-    return current
 
 @sync_to_async
+def get_root_referrer(user_id: str):
+    """Optimized version of get_root_referrer"""
+    try:
+        user = TelegramUser.objects.only('invited_by').filter(telegram_id=user_id).first()
+        if not user or not user.invited_by:
+            return None
+        
+        # Use recursive query if your DB supports it (PostgreSQL)
+        # Or limit the depth to prevent infinite loops
+        current = user
+        visited = set()
+        max_depth = 10
+        
+        for _ in range(max_depth):
+            if not current.invited_by or current.invited_by.telegram_id in visited:
+                break
+            visited.add(current.telegram_id)
+            current = current.invited_by
+        
+        return current
+    except Exception as e:
+        print(f"[get_root_referrer] Error: {e}")
+        return None
+    
+@sync_to_async
 def create_referral_payment_request(user_id: str, amount: float):
-    """Referral to'lov so'rovini yaratish (avtomatik ravishda root referrerga)"""
-    user = TelegramUser.objects.filter(telegram_id=user_id).first()
-    if not user:
+    """Referral to'lov so'rovini yaratish (Root referrer bilan)"""
+    try:
+        print(f"[create_referral_payment] Creating payment for user {user_id}, amount {amount}")
+        
+        user = TelegramUser.objects.filter(telegram_id=user_id).first()
+        if not user:
+            print(f"[create_referral_payment] User {user_id} not found")
+            return None
+        
+        print(f"[create_referral_payment] User found: {user.full_name}")
+        
+        # Root referrer-ni topish
+        current = user
+        level_count = 0
+        
+        while current.invited_by:
+            current = current.invited_by
+            level_count += 1
+            print(f"[create_referral_payment] Level {level_count}: {current.telegram_id} - {current.full_name}")
+            
+            # Infinite loop dan himoya qilish
+            if level_count > 10:
+                print(f"[create_referral_payment] Breaking at level {level_count}")
+                break
+        
+        # Agar root referrer yo'q bo'lsa (user o'zi root), return None
+        if current == user:
+            print(f"[create_referral_payment] User {user_id} is root, no payment needed")
+            return None
+        
+        root_referrer = current
+        print(f"[create_referral_payment] Root referrer: {root_referrer.telegram_id} - {root_referrer.full_name}")
+        
+        # ReferralPayment yaratish
+        payment = ReferralPayment.objects.create(
+            user=user,
+            referrer=root_referrer,
+            amount=amount,
+            payment_type='REFERRAL_BONUS',
+            status='PENDING'
+        )
+        
+        print(f"[create_referral_payment] Payment created with ID: {payment.id}")
+        return payment
+        
+    except Exception as e:
+        print(f"[create_referral_payment] Error: {e}")
+        import traceback
+        print(f"[create_referral_payment] Traceback: {traceback.format_exc()}")
         return None
-    
-    root_referrer = get_root_referrer(user_id)
-    if not root_referrer:
-        return None
-    
-    payment = ReferralPayment(
-        user=user,
-        referrer=root_referrer,
-        amount=amount,
-        payment_type='REFERRAL_BONUS',
-        status='PENDING'
-    )
-    payment.save()
-    return payment
 
 @sync_to_async
 def get_user_referral_network_stats(user_id: str) -> dict:

@@ -676,3 +676,31 @@ class Gifts(models.Model):
             models.Index(fields=['name']),
             models.Index(fields=['is_active']),
         ]
+
+# models.py ga quyidagi modelni qo'shing
+class ReferrerUpdateQueue(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Kutilmoqda'),
+        ('RESOLVED', 'Hal qilingan'),
+        ('AUTO_REPLACED', 'Avtomatik almashtirilgan'),
+        ('FAILED', 'Xatolik')
+    ]
+    
+    user_telegram_id = models.CharField(max_length=50)
+    referrer_telegram_id = models.CharField(max_length=50)
+    user_level = models.CharField(max_length=20)
+    referrer_level = models.CharField(max_length=20)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    is_processed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.user_telegram_id} → {self.referrer_telegram_id} ({self.status})"
+    
+    class Meta:
+        verbose_name = "Referrer Yangilash Navbati"
+        verbose_name_plural = "Referrer Yangilash Navbatlari"
+        indexes = [
+            models.Index(fields=['is_processed', 'created_at']),
+        ]

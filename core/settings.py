@@ -14,6 +14,8 @@ import os
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from pathlib import Path
+from celery import Celery
+from celery.schedules import crontab
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -72,15 +74,38 @@ LOGGING = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['https://a91a706c2606.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://24853e1f8fde.ngrok-free.app']
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = 'a91a706c2606.ngrok-free.app'
+CSRF_COOKIE_DOMAIN = '24853e1f8fde.ngrok-free.app'
 CORS_ORIGIN_WHITELIST = (
-    'https://a91a706c2606.ngrok-free.app'
+    'https://24853e1f8fde.ngrok-free.app'
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ########### End Cors 
 
+# Celery sozlamalari
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Tashkent'
+celery_app = Celery('core')
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/1'
+
+celery_app.conf.broker_url = 'redis://redis:6379/0'
+celery_app.conf.result_backend = 'redis://redis:6379/1'
+
+celery_app.conf.beat_schedule = {
+    'process-pending-referrer-updates': {
+        'task': 'bot.tasks.process_pending_referrer_updates',
+        'schedule': crontab(minute='*/30'),  # Har 30 daqiqada ishlaydi
+    },
+    'check-all-referral-levels': {
+        'task': 'bot.tasks.check_all_referral_levels',
+        'schedule': crontab(hour=3, minute=0),  # Har kuni soat 3:00 da
+    },
+}
 
 
 # Application definition
@@ -234,7 +259,6 @@ UNFOLD = {
         },
     },
     
-    
     "SIDEBAR": {
         "show_search": False,
         "show_all_applications": False,
@@ -258,38 +282,37 @@ UNFOLD = {
                         "link": reverse_lazy("admin:bot_mandatorychannel_changelist"),
                         "icon": "link",
                     },
-
-
                     {
                         "title": ("Bildirishnomalar"),
                         "link": reverse_lazy("admin:bot_notification_changelist"),
                         "icon": "notifications",
-
                     },
-
                     {
                         "title": ("To'lovlar"),
                         "link": reverse_lazy("admin:bot_payments_changelist"),
                         "icon": "payment",
                     },
-
                     {
                         "title": ("Kurs qatnashchilari"),
                         "link": reverse_lazy("admin:bot_courseparticipant_changelist"),
                         "icon": "group_add",
                     },
-
                     {
                         "title": ("Kurslar"),
                         "link": reverse_lazy("admin:bot_kurslar_changelist"),
                         "icon": "book",
                     },
                     {
-                        "title": ("Gifts"),
+                        "title": ("Sovg'alar"),
                         "link": reverse_lazy("admin:bot_gifts_changelist"),
                         "icon": "card_giftcard",
                     },
-
+                    {
+                        "title": ("Referali yangilanadigan foydalanuvchilar"),
+                        "link": reverse_lazy("admin:bot_referrerupdatequeue_changelist"),
+                        "icon": "users"
+                    }
+                    
                 ],
             }
         ],

@@ -68,7 +68,8 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
             payload = {
                 'chat_id': chat_id,
                 'text': message,
-                'reply_markup': reply_markup
+                'reply_markup': reply_markup, 
+                'parse_mode': 'HTML'
             }
 
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -107,7 +108,8 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
             payload = {
                 'chat_id': chat_id,
                 'text': message,
-                'reply_markup': reply_markup
+                'reply_markup': reply_markup,
+                'parse_mode': 'HTML'
             }
 
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
