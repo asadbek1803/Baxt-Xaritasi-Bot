@@ -127,12 +127,6 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                     callback_data=f"copy_ref_{user_data['telegram_id']}",
                 )
             )
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="💳 Plastik karta ma'lumotlari",
-                    callback_data=f"card_info_{user_data['telegram_id']}",
-                )
-            )
         else:
             # show course-related buttons
             try:
