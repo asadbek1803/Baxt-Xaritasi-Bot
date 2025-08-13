@@ -74,11 +74,11 @@ LOGGING = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ['https://24853e1f8fde.ngrok-free.app']
+CSRF_TRUSTED_ORIGINS = ['https://b8830a02f0ae.ngrok-free.app']
 CORS_REPLACE_HTTPS_REFERER = True
 CSRF_COOKIE_DOMAIN = '24853e1f8fde.ngrok-free.app'
 CORS_ORIGIN_WHITELIST = (
-    'https://24853e1f8fde.ngrok-free.app'
+    'https://b8830a02f0ae.ngrok-free.app'
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 ########### End Cors 
@@ -293,6 +293,11 @@ UNFOLD = {
                         "icon": "payment",
                     },
                     {
+                        "title": ("Referral To'lovlar"),
+                        "link": reverse_lazy("admin:bot_referralpayment_changelist"),
+                        "icon": "payment",
+                    },
+                    {
                         "title": ("Kurs qatnashchilari"),
                         "link": reverse_lazy("admin:bot_courseparticipant_changelist"),
                         "icon": "group_add",
@@ -310,7 +315,7 @@ UNFOLD = {
                     {
                         "title": ("Referali yangilanadigan foydalanuvchilar"),
                         "link": reverse_lazy("admin:bot_referrerupdatequeue_changelist"),
-                        "icon": "users"
+                        "icon": "account_circle"
                     }
                     
                 ],

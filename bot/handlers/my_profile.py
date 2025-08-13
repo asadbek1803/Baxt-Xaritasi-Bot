@@ -6,12 +6,11 @@ from bot.selectors import (
     get_user_profile_by_telegram_id,
     get_referrer_display_by_telegram_id,
     get_course_for_next_level_by_user_level,
-    get_referral_link_for_user
+    get_referral_link_for_user,
 )
 from bot.buttons.default.back import get_back_keyboard
 
 router = Router()
-
 
 
 def format_user_level(level: str) -> str:
@@ -38,29 +37,37 @@ async def my_profile_handler(message: types.Message, bot: Bot):
         user_data = await get_user_profile_by_telegram_id(user_id)
 
         if not user_data:
-            await message.answer("❌ Sizning profilingiz topilmadi. Iltimos, avval ro'yxatdan o'ting.")
+            await message.answer(
+                "❌ Sizning profilingiz topilmadi. Iltimos, avval ro'yxatdan o'ting."
+            )
             return
         # Foydalanuvchi darajasini formatlash
-        if user_data.get('level') == "level_0" or user_data.get('level') == "0-bosqich":
-        
+        if user_data.get("level") == "level_0" or user_data.get("level") == "0-bosqich":
+
             await bot.send_message(
                 chat_id=user_id,
-                text="🔒 Sizning darajangiz 0-daraja (1-darjaga) o'tish uchun '⚡️ Bosqichlar' bo'limidan 1-kursni sotib oling!"
+                text="🔒 Sizning darajangiz 0-daraja (1-darjaga) o'tish uchun '⚡️ Bosqichlar' bo'limidan 1-kursni sotib oling!",
             )
             return
 
-        user_level_formatted = format_user_level(user_data.get('level'))
+        user_level_formatted = format_user_level(user_data.get("level"))
 
         # Referrer display (we already have invited_by in user_data, but use helper to be safe)
-        invited = user_data.get('invited_by')
+        invited = user_data.get("invited_by")
         if invited:
-            if invited.get('telegram_username'):
-                referrer_display = f"{invited.get('full_name')} (@{invited.get('telegram_username')})"
+            if invited.get("telegram_username"):
+                referrer_display = (
+                    f"{invited.get('full_name')} (@{invited.get('telegram_username')})"
+                )
             else:
-                referrer_display = invited.get('full_name') or "Yo'q"
+                referrer_display = invited.get("full_name") or "Yo'q"
         else:
             # fallback: try selector that formats inviter display
-            referrer_display = await get_referrer_display_by_telegram_id(invited.get('telegram_id')) if invited else "Yo'q"
+            referrer_display = (
+                await get_referrer_display_by_telegram_id(invited.get("telegram_id"))
+                if invited
+                else "Yo'q"
+            )
 
         profile_info = (
             f"👤 <b>Shaxsiy ma'lumotlar</b>\n"
@@ -82,52 +89,62 @@ async def my_profile_handler(message: types.Message, bot: Bot):
         )
 
         # Referal link (faqat tasdiqlangan userlar uchun)
-        if user_data.get('is_confirmed'):
+        if user_data.get("is_confirmed"):
             try:
-                referral_link = await get_referral_link_for_user(user_data['telegram_id'])
+                referral_link = await get_referral_link_for_user(
+                    user_data["telegram_id"]
+                )
                 profile_info += f"└ Referal link: <code>{referral_link}</code>\n\n"
             except Exception as e:
                 print(f"[my_profile_handler] Error getting referral link: {e}")
                 profile_info += "└ Referal link: Xatolik\n\n"
         else:
-            profile_info += "└ Referal link: 🔒 Tasdiqlanganidan keyin mavjud bo'ladi\n\n"
+            profile_info += (
+                "└ Referal link: 🔒 Tasdiqlanganidan keyin mavjud bo'ladi\n\n"
+            )
 
         # Status
-        status_text = "✅ Tasdiqlangan admin tomonidan" if user_data.get('is_confirmed') else "⏳ Tasdiqlanmagan"
+        status_text = (
+            "✅ Tasdiqlangan admin tomonidan"
+            if user_data.get("is_confirmed")
+            else "⏳ Tasdiqlanmagan"
+        )
         profile_info += f"🛡 <b>Status</b>\n└ {status_text}"
 
         # Create keyboard
         builder = InlineKeyboardBuilder()
 
-        if user_data.get('is_confirmed'):
+        if user_data.get("is_confirmed"):
             builder.row(
                 types.InlineKeyboardButton(
                     text="📊 Statistikani ko'rish",
-                    callback_data=f"stats_{user_data['telegram_id']}"
+                    callback_data=f"stats_{user_data['telegram_id']}",
                 )
             )
             builder.row(
                 types.InlineKeyboardButton(
                     text="📋 Referal linkni nusxalash",
-                    callback_data=f"copy_ref_{user_data['telegram_id']}"
+                    callback_data=f"copy_ref_{user_data['telegram_id']}",
                 )
             )
             builder.row(
                 types.InlineKeyboardButton(
                     text="💳 Plastik karta ma'lumotlari",
-                    callback_data=f"card_info_{user_data['telegram_id']}"
+                    callback_data=f"card_info_{user_data['telegram_id']}",
                 )
             )
         else:
             # show course-related buttons
             try:
-                course = await get_course_for_next_level_by_user_level(user_data.get('level'))
+                course = await get_course_for_next_level_by_user_level(
+                    user_data.get("level")
+                )
                 if course:
-                    if user_data.get('is_confirmed') == False:
+                    if not user_data.get("is_confirmed"):
                         builder.row(
                             types.InlineKeyboardButton(
                                 text="📢 Referral yaratish",
-                                callback_data=f"create_referral_{course['id']}"
+                                callback_data=f"create_referral_{course['id']}",
                             )
                         )
                         profile_info += (
@@ -138,26 +155,22 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                     builder.row(
                         types.InlineKeyboardButton(
                             text="🛒 Kurs sotib olish",
-                            callback_data=f"buy_course_{course['id']}"
+                            callback_data=f"buy_course_{course['id']}",
                         )
                     )
 
             except Exception as e:
                 print(f"[my_profile_handler] Error getting course for buttons: {e}")
-
+        builder.row(
+            types.InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_home")
+        )
         # Send message with or without keyboard
         try:
             if builder.export():
                 await message.answer(
                     text=profile_info,
                     reply_markup=builder.as_markup(),
-                    parse_mode="HTML"
-                )
-                await bot.send_message(
-                    chat_id=user_id,
-                    text = " 👤 Mening hisobim",
-                    reply_markup=get_back_keyboard(),
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
             else:
                 await message.answer(
@@ -167,7 +180,9 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                 )
         except Exception as e:
             print(f"[my_profile_handler] Send message error: {e}")
-            await message.answer("❌ Profil ma'lumotlarini yuborishda xatolik yuz berdi.")
+            await message.answer(
+                "❌ Profil ma'lumotlarini yuborishda xatolik yuz berdi."
+            )
 
     except Exception as e:
         print(f"[my_profile_handler] Unexpected error: {e}")
@@ -188,8 +203,11 @@ async def copy_referral_link(callback: types.CallbackQuery):
             await callback.answer("❌ Foydalanuvchi topilmadi!", show_alert=True)
             return
 
-        if not user_data.get('is_confirmed'):
-            await callback.answer("🔒 Bu funksiya faqat tasdiqlangan foydalanuvchilar uchun!", show_alert=True)
+        if not user_data.get("is_confirmed"):
+            await callback.answer(
+                "🔒 Bu funksiya faqat tasdiqlangan foydalanuvchilar uchun!",
+                show_alert=True,
+            )
             return
 
         referral_link = await get_referral_link_for_user(user_id)
@@ -198,7 +216,7 @@ async def copy_referral_link(callback: types.CallbackQuery):
             f"Quyidagi linkni nusxalash uchun bosing:\n\n"
             f"<code>{referral_link}</code>\n\n"
             f"Bu link orqali sizga taklif qilingan har bir yangi foydalanuvchi uchun bonus olasiz!",
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
         await callback.answer("✅ Referal link yuborildi!", show_alert=False)
 
@@ -221,8 +239,11 @@ async def show_user_stats(callback: types.CallbackQuery):
             await callback.answer("❌ Foydalanuvchi topilmadi!", show_alert=True)
             return
 
-        if not user_data.get('is_confirmed'):
-            await callback.answer("🔒 Bu funksiya faqat tasdiqlangan foydalanuvchilar uchun!", show_alert=True)
+        if not user_data.get("is_confirmed"):
+            await callback.answer(
+                "🔒 Bu funksiya faqat tasdiqlangan foydalanuvchilar uchun!",
+                show_alert=True,
+            )
             return
 
         stats_info = (
@@ -236,7 +257,7 @@ async def show_user_stats(callback: types.CallbackQuery):
         )
 
         try:
-            referral_link = await get_referral_link_for_user(user_data['telegram_id'])
+            referral_link = await get_referral_link_for_user(user_data["telegram_id"])
             stats_info += f"🔗 Referal link: <code>{referral_link}</code>"
         except Exception as e:
             print(f"[show_user_stats] Error getting referral link: {e}")
