@@ -84,6 +84,9 @@ async def create_referral(callback: types.CallbackQuery, state: FSMContext):
         card_holder = getattr(
             root_referrer, "card_holder_full_name", "Ma'lumot mavjud emas"
         )
+        root_user_phone = getattr(root_referrer, "phone_number", "Ma'lumot mavjud emas!")
+        root_user_telegram_username = getattr(root_referrer, "telegram_username", "Ma'lumot mavjud emas!")
+
 
         payment_text = (
             "💡 Referral tizimi haqida:\n\n"
@@ -93,6 +96,8 @@ async def create_referral(callback: types.CallbackQuery, state: FSMContext):
             "   - Ular ham 200,000 so'm to'lashadi\n"
             "   - To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal 200 ming so'mdan sizga to'lov qilishadi.\n\n"
             "💳 To'lov uchun karta ma'lumotlari:\n"
+            f"Telefon raqami: <code> {root_user_phone} </code>\n"
+            f"Telegram profili: @{root_user_telegram_username}\n"
             f"Karta: <code>{card_number}</code>\n"
             f"Karta egasi: <b>{card_holder}</b>\n\n"
             "To'lov qilganingizdan so'ng pastdagi tugmani bosing:"
@@ -292,9 +297,7 @@ async def confirm_referral_payment(callback: types.CallbackQuery):
         try:
             payment_user = payment.user
             if not payment_user.referral_code:
-                payment_user.referral_code = str(payment_user.telegram_id)[
-                    -8:
-                ]  # Simple referral code
+                payment_user.referral_code = str(payment_user.telegram_id)[-8:]  # Simple referral code
             payment_user.is_confirmed = True
             await sync_to_async(payment_user.save)()
         except Exception as e:
@@ -312,7 +315,6 @@ async def confirm_referral_payment(callback: types.CallbackQuery):
                 text="🎉 Tabriklaymiz! Sizning referral to'lovingiz tasdiqlandi.\n\n"
                 "Endi siz ham o'z referral kodingiz orqali odam taklif qilishingiz mumkin!",
             )
-
             await callback.bot.send_message(
                 chat_id=payment_user.telegram_id,
                 text=f"🎯 Sizning Referral Ma'lumotlaringiz:\n\n"

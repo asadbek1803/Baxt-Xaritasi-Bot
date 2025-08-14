@@ -161,21 +161,24 @@ Kursni sotib olishni xohlaysizmi?
                         callback_data=f"create_referral_{course.id}"
                     )
                 ])
+            else:
 
-            keyboard_buttons.extend([
-                [
-                    InlineKeyboardButton(
-                        text="💳 Sotib olish",
-                        callback_data=f"buy_course_{course.id}"
-                    )
-                ],
+
+                keyboard_buttons.extend([
+                    [
+                        InlineKeyboardButton(
+                            text="💳 Sotib olish",
+                            callback_data=f"buy_course_{course.id}"
+                        )
+                    ]])
+            keyboard_buttons.append(
                 [
                     InlineKeyboardButton(
                         text="◀️ Orqaga", 
                         callback_data="back_to_stages"
                     )
                 ]
-            ])
+            )
 
             keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
             await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
@@ -194,6 +197,7 @@ Kursni sotib olishni xohlaysizmi?
 async def back_to_stages(callback: types.CallbackQuery, state: FSMContext):
     """Bosqichlar menyusiga qaytish"""
     user_id = str(callback.from_user.id)
+    
 
     user = await get_user(user_id)
     if not user:
