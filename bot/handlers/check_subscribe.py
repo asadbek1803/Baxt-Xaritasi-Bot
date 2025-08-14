@@ -73,15 +73,6 @@ async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
             [
                 InlineKeyboardButton(
                     text="🛒 Sotib olish", callback_data=f"buy_course_{course.id}"
-                ),
-                InlineKeyboardButton(
-                    text="📢 Referralimni yaratish",
-                    callback_data=f"create_referral_{course.id}",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🔄 A'zolikni tekshirish", callback_data="check_subscription"
                 )
             ],
         ]
