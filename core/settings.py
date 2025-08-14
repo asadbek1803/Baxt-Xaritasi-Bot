@@ -27,8 +27,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-2)h%6&fi_(_3*uzd^gkep9)7ywo%c3y+cr-k2*g3dv=b0y@e#l"
-TELEGRAM_BOT_USERNAME = "UzDonationBot"
-TELEGRAM_BOT_TOKEN = "7592929768:AAHlLmE-DAssUMR-V7MZTG0vKFSjmGI1F68"
+TELEGRAM_BOT_USERNAME = "asfdhkBot"
+TELEGRAM_BOT_TOKEN = "7548987414:AAFLgdxKWns3HLXFqQ_ZWgaA7qIjQT70oLw"
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -79,10 +79,13 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "https://newlive.uz",
     "http://newlive.uz",
+    "https://0aaca1b5a486.ngrok-free.app",
+    "http://0aaca1b5a486.ngrok-free.app"
 ]
+
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = "newlive.uz"
-CORS_ORIGIN_WHITELIST = ("https://newlive.uz", "http://newlive.uz")
+CSRF_COOKIE_DOMAIN = "0aaca1b5a486.ngrok-free.app"
+CORS_ORIGIN_WHITELIST = ("https://newlive.uz", "http://newlive.uz", "https://0aaca1b5a486.ngrok-free.app", "http://0aaca1b5a486.ngrok-free.app")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Celery sozlamalari

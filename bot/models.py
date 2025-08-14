@@ -401,77 +401,112 @@ class Payments(models.Model):
             self.is_confirmed = False
         super().save(*args, **kwargs)
     
-    # Payments modeliga qo'shimcha
     def confirm_payment(self):
+        """To'lovni tasdiqlash va foydalanuvchi levelini yangilash"""
         self.status = 'CONFIRMED'
         self.is_confirmed = True
         self.confirmed_date = timezone.now()
         
-        # *** YANGI QO'SHILDI: To'lov qabul qilingandan so'ng referrer darajasini tekshirish ***
-        
         # Foydalanuvchi darajasini yangilash
-        levels = list(LEVEL_CHOICES)
-        # Find index by value (label), fallback to key if needed
-        try:
-            current_level_index = [label for key, label in levels].index(self.user.level)
-        except ValueError:
-            # If not found by label, try by key
-            current_level_index = [key for key, label in levels].index(self.user.level)
-        if current_level_index < len(levels) - 1:
-            new_level = levels[current_level_index + 1][0]  # get the key for the next level
-            self.user.level = new_level
-
-        self.user.save()
-        self.save()
+        current_level = self.user.level
+        print(f"Current user level: {current_level}")
         
+        try:
+            # Level formatini normalizatsiya qilish
+            if current_level.startswith('level_'):
+                current_level_num = int(current_level.split('_')[1])
+            elif "-bosqich" in current_level:
+                current_level_num = int(current_level.split("-")[0])
+            else:
+                current_level_num = 0
 
-        # Kurs to'lovi bo'lsa
-        if self.payment_type == 'COURSE' and self.course:
-            CourseParticipant.objects.get_or_create(
-                user=self.user,
-                course=self.course,
-                payment=self
-            )
-            # Referal bonusini hisoblash
+            # Kurs to'lovi bo'lsa va course mavjud bo'lsa
+            if self.payment_type == 'COURSE' and self.course:
+                # Course level dan keyingi levelni aniqlash
+                if self.course.level and self.course.level.startswith('level_'):
+                    course_level_num = int(self.course.level.split('_')[1])
+                    
+                    # Foydalanuvchi levelini course level bilan bog'lash
+                    # Agar course level foydalanuvchi levelidan yuqori bo'lsa
+                    if course_level_num > current_level_num:
+                        new_level = f"level_{course_level_num}"
+                        self.user.level = new_level
+                        self.user.save(update_fields=['level'])
+                        print(f"User level updated to: {new_level}")
+                    
+                    # CourseParticipant yaratish
+                    from .models import CourseParticipant
+                    CourseParticipant.objects.get_or_create(
+                        user=self.user,
+                        course=self.course,
+                        defaults={'payment': self}
+                    )
+            
+            # Agar oddiy level advancement kerak bo'lsa (course yo'q)
+            elif self.payment_type == 'COURSE' and not self.course:
+                # Keyingi levelga o'tkazish
+                next_level_num = current_level_num + 1
+                if next_level_num <= 7:  # 7-bosqichgacha
+                    new_level = f"level_{next_level_num}"
+                    self.user.level = new_level
+                    self.user.save(update_fields=['level'])
+                    print(f"User level updated to: {new_level}")
+
+            # Referal bonusi (agar kerak bo'lsa)
             if self.user.invited_by:
                 referrer = self.user.invited_by
-                referrer.referral_count += 1
-                referrer.save()
-            Notification.objects.create(
-                recipient=self.user,
-                sender=None,  # Admin yoki tizim xabari
-                notification_type='PAYMENT_CONFIRMED',
-                title="To'lov tasdiqlandi",
-                message=f"Sizning to'lovingiz {self.amount} so'm miqdorida tasdiqlandi. Kursga qo'shildingiz!",
-                extra_data={
-                    'course_id': self.course.id if self.course else None,
-                    'payment_id': self.id
-                }
-            )
-    
+                referrer.update_referral_count()
+
+            # Notification yaratish
+            try:
+                from .models import Notification
+                Notification.objects.create(
+                    recipient=self.user,
+                    sender=None,
+                    notification_type='PAYMENT_CONFIRMED',
+                    title="To'lov tasdiqlandi",
+                    message=f"Sizning to'lovingiz {self.amount} so'm miqdorida tasdiqlandi.",
+                    extra_data={
+                        'course_id': self.course.id if self.course else None,
+                        'payment_id': self.id
+                    }
+                )
+            except Exception as e:
+                print(f"Error creating notification: {e}")
+
+        except Exception as e:
+            print(f"Error in confirm_payment: {e}")
+            # Xato bo'lsa ham to'lovni tasdiqlash
+            pass
+        
+        # To'lovni saqlash
+        self.save()
+        print(f"Payment confirmed for user: {self.user.full_name}")
+
+
     def reject_payment(self, reason):
+        """To'lovni rad etish"""
         self.status = 'REJECTED'
         self.is_confirmed = False
         self.rejection_reason = reason
+        self.confirmed_date = timezone.now()
         self.save()
         
-        Notification.objects.create(
-            recipient=self.user,
-            sender=None,  # Admin yoki tizim xabari
-            notification_type='PAYMENT_REJECTED',
-            title="To'lov rad etildi",
-            message=f"Sizning to'lovingiz {self.amount} so'm miqdorida rad etildi. Sababi: {reason}",
-            extra_data={
-                'payment_id': self.id
-            }
-        )
-    def clean(self):
-        """
-        Model validatsiyasi
-        """
-        if self.status == 'CONFIRMED' and not self.confirmed_by:
-            from django.core.exceptions import ValidationError
-            raise ValidationError("Tasdiqlangan to'lov uchun admin ko'rsatilishi kerak")
+        # Notification yaratish
+        try:
+            from .models import Notification
+            Notification.objects.create(
+                recipient=self.user,
+                sender=None,
+                notification_type='PAYMENT_REJECTED',
+                title="To'lov rad etildi",
+                message=f"Sizning to'lovingiz {self.amount} so'm miqdorida rad etildi. Sababi: {reason}",
+                extra_data={
+                    'payment_id': self.id
+                }
+            )
+        except Exception as e:
+            print(f"Error creating rejection notification: {e}")
     
    
         
