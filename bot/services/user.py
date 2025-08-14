@@ -45,7 +45,7 @@ async def create_user(
                 level=level,
                 gender=gender,
                 card_number=card_number,
-                card_holder_name=card_holder_name,
+                card_holder_full_name=card_holder_name,
             )
             if updated:
                 return await sync_to_async(_get_user_sync)(telegram_id)
@@ -65,7 +65,7 @@ async def create_user(
             level=level,
             gender=gender,
             card_number=card_number,
-            card_holder_name=card_holder_name,
+            card_holder_full_name=card_holder_name,
         )
 
         if user:
@@ -126,7 +126,7 @@ async def update_user(
     invited_by: TelegramUser = None,  # Yangi maydon qo'shildi
     referral_code: str = None,  # Yangi maydon qo'shildi
     card_number: str = None,
-    card_holder_name: str = None,
+    card_holder_full_name: str = None,
 ) -> bool:
     """
     Updates user data with proper connection handling and validation
@@ -161,7 +161,7 @@ async def update_user(
             "invited_by": invited_by,
             "referral_code": referral_code,
             "card_number": card_number,
-            "card_holder_name": card_holder_name,
+            "card_holder_full_name": card_holder_full_name,
         }.items()
         if k in allowed_fields and v is not None
     }

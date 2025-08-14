@@ -218,7 +218,7 @@ def get_course_by_user_level(user_level: str):
             )
 
         # Keyingi bosqich nomini aniqlaymiz
-        next_level_int = user_level_int + 1
+        next_level_int = user_level_int
         next_level = f"{next_level_int}-bosqich"
 
         # User level-ini course level formatiga o'girish
@@ -293,7 +293,7 @@ def get_level_kurs(level: str):
         user_level_int = int(level.split("-")[0])
 
         # Keyingi bosqich nomini aniqlaymiz
-        next_level_int = user_level_int + 1
+        next_level_int = user_level_int
         next_level = f"{next_level_int}-bosqich"
 
         # User level-ini course level formatiga o'girish

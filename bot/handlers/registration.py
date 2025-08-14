@@ -1,9 +1,8 @@
-import html
 import logging
 from aiogram import Router, types, F, Bot
 from aiogram.fsm.context import FSMContext
 
-from bot.selectors import get_course_by_user_level, get_user_level
+from bot.selectors import get_course_by_user_level, get_user_level, get_user_purchased_courses_with_levels
 from bot.states import UserRegistrationState
 from bot.constants import Messages, REGIONS, PROFESSIONS, Button
 from bot.buttons.inline.age import get_age_button
@@ -15,7 +14,7 @@ from bot.utils.formatters import format_phone_number
 from bot.utils.helpers import get_region_code_by_name, get_gender_code_by_name
 from bot.services.user import create_user, get_user_by_referral_code
 from bot.services.subscribe import check_channels_after_registration
-
+from bot.buttons.inline.stages import get_stages_keyboard
 router = Router()
 
 
@@ -203,6 +202,8 @@ async def process_profession_callback(callback: types.CallbackQuery, state: FSMC
 async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
     gender_name = message.text.strip().title()
     gender_code = get_gender_code_by_name(gender_name)
+    user_id = message.from_user.id
+    
     if not gender_code:
         await message.answer(
             Messages.gender_error.value, reply_markup=get_gender_keyboard()
@@ -231,7 +232,7 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
             gender=gender_code,
             referral_code=None,
             invited_by=invited_by_user,
-            level="0-bosqich",
+            level="1-bosqich",
             age=data.get("age"),
             card_number=data.get("card_number"),
             card_holder_name=data.get("card_holder_name"),
@@ -245,17 +246,16 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
         if invited_by_user:
             referral_message = f"\n\n🎉 Siz {invited_by_user.full_name} tomonidan taklif qilindingiz!"
 
-        user_level = await get_user_level(telegram_id=message.from_user.id)
+        user_level = await get_user_level(telegram_id=user_id)
         course = await get_course_by_user_level(user_level)
         price_formatted = "{:,}".format(course.price)
+        purchased_course_levels = await get_user_purchased_courses_with_levels(user_id)
 
         await message.answer(
             Messages.welcome_message_for_registration.value.format(price_formatted) + referral_message,
             parse_mode="HTML",
-            reply_markup=types.ReplyKeyboardRemove()
+            reply_markup=get_stages_keyboard(user_level, purchased_course_levels, False)
         )
-
-        await check_channels_after_registration(message, bot)
 
     except Exception as e:
         logging.error(f"Registration error: {e}", exc_info=True)

@@ -1,5 +1,4 @@
 from aiogram import types, Router, F
-from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -23,7 +22,7 @@ def get_stages_keyboard(
 
     # Foydalanuvchining hozirgi level raqamini olish
     try:
-        current_level_num = int(user_level.split("-")[0])
+        current_level_num = int(user_level.split("-")[0]) + 1
     except (ValueError, AttributeError):
         current_level_num = 0
 
@@ -86,7 +85,6 @@ Sizning hozirgi darajangiz: <b>{user_level}</b>
 <b>Bosqichlar haqida:</b>
 ✅ - Tugallangan bosqich (kurs sotib olingan)
 🔓 - Ochiq bosqich (kurs sotib olinmagan)
-🔐 - Keyingi bosqich (sotib olish mumkin)
 🔒 - Yopiq bosqich (avval oldingi bosqichni tugating)
 
 <b>Qoidalar:</b>
@@ -108,6 +106,7 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
     user_id = str(callback.from_user.id)
     action_data = callback.data.split("_")
     user = await get_user(user_id)
+
     if len(action_data) < 3:
         await callback.answer("❌ Noto'g'ri ma'lumot")
         return
@@ -122,10 +121,12 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
 
     elif stage_type == "available":
         # Ochiq bosqich (lekin kurs sotib olinmagan) - kurs sotib olishni taklif qilish
-        previous_level = f"{level_num-1}-bosqich"
+        previous_level = f"{level_num}-bosqich"
         course = await get_level_kurs(previous_level)
 
         if course:
+            await callback.answer(f"course name : {not user.is_confirmed}")
+
             text = f"""
                 🎯 <b>{level_name} bosqichi</b>
 
@@ -138,44 +139,24 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
                 Kursni sotib olishni xohlaysizmi?
                             """
 
-            if not user.is_confirmed:
-                text += "\n\n💡 <b>Referral yaratish orqali ham kurs sotib olishingiz mumkin!</b>"
-
-                refferal_button = InlineKeyboardButton(
-                    text="📢 Referral yaratish",
-                    callback_data=f"create_referral_{course.id}",
-                )
-
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[[refferal_button]])
-
-                await callback.answer(
-                    "💡 Referral yaratish orqali ham kurs sotib olishingiz mumkin!",
-                    show_alert=True,
-                )
-
-                await callback.message.answer(
-                    text, reply_markup=keyboard, parse_mode="HTML"
-                )
-            else:
-
-                keyboard = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="💳 Sotib olish",
-                                callback_data=f"buy_course_{course.id}",
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                text="◀️ Orqaga", callback_data="back_to_stages"
-                            )
-                        ],
-                    ]
-                )
-                await callback.message.edit_text(
-                    text, reply_markup=keyboard, parse_mode="HTML"
-                )
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="💳 Sotib olish",
+                            callback_data=f"buy_course_{course.id}",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="◀️ Orqaga", callback_data="back_to_stages"
+                        )
+                    ],
+                ]
+            )
+            await callback.message.edit_text(
+                text, reply_markup=keyboard, parse_mode="HTML"
+            )
         else:
             await callback.answer(
                 f"❌ {level_name} uchun kurs topilmadi", show_alert=True
@@ -183,7 +164,7 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
 
     elif stage_type == "next":
         # Keyingi bosqich - kurs sotib olishni taklif qilish
-        previous_level = f"{level_num-1}-bosqich"
+        previous_level = f"{level_num}-bosqich"
         course = await get_level_kurs(previous_level)
 
         if course:
@@ -207,12 +188,6 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
                 )
 
                 keyboard = InlineKeyboardMarkup(inline_keyboard=[[refferal_button]])
-
-                await callback.answer(
-                    "💡 Referral yaratish orqali ham kurs sotib olishingiz mumkin!",
-                    show_alert=True,
-                )
-
                 await callback.message.answer(
                     text, reply_markup=keyboard, parse_mode="HTML"
                 )

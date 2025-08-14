@@ -238,6 +238,7 @@ class TelegramUser(models.Model):
             models.Index(fields=['is_confirmed', 'registration_date']),
         ]
 
+
 class ReferralPayment(models.Model):
     user = models.ForeignKey(
         TelegramUser, 
