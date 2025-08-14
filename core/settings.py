@@ -74,9 +74,14 @@ LOGGING = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ["https://newlive.uz", "http://newlive.uz"]
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "https://newlive.uz",
+    "http://newlive.uz",
+]
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = "24853e1f8fde.ngrok-free.app"
+CSRF_COOKIE_DOMAIN = "newlive.uz"
 CORS_ORIGIN_WHITELIST = ("https://newlive.uz", "http://newlive.uz")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -117,9 +122,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    ### Local apps
-    "bot",  # Telegram bot application
-    ### Third-party apps
+    "bot",
     "django_extensions",
 ]
 
