@@ -232,7 +232,7 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
             gender=gender_code,
             referral_code=None,
             invited_by=invited_by_user,
-            level="1-bosqich",
+            level="0-bosqich",
             age=data.get("age"),
             card_number=data.get("card_number"),
             card_holder_name=data.get("card_holder_name"),

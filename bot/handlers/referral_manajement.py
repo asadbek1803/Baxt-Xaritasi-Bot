@@ -271,7 +271,7 @@ async def confirm_referral_payment(callback: types.CallbackQuery):
                 )
             )()
         except ReferralPayment.DoesNotExist:
-            return await callback.ans0202000wer("❌ To'lov topilmadi!", show_alert=True)
+            return await callback.answer("❌ To'lov topilmadi!", show_alert=True)
         except Exception as e:
             print(f"[confirm_referral] Database error: {e}")
             return await callback.answer(

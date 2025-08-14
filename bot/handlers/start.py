@@ -89,7 +89,7 @@ async def start_command(message: types.Message, state: FSMContext):
     user_level = await get_user_level(telegram_id=user_id)
 
     # Agar foydalanuvchi birinchi bosqichda bo'lsa
-    if user_level == "0-bosqich":
+    if user_level == "1-bosqich":
         has_course = await get_user_buy_course(user_id)
 
         if has_course:
