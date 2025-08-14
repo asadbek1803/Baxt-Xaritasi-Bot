@@ -18,9 +18,7 @@ async def create_user(
     invited_by: TelegramUser = None,  # refferal_user o'rniga invited_by
     region: str = None,
     level: str = "0-bosqich",
-    gender: str = None,
-    card_number: str = None,
-    card_holder_name: str = None,
+    gender: str = None
 ) -> TelegramUser:
     """
     Creates a new Telegram user with proper async handling and connection management
@@ -43,9 +41,7 @@ async def create_user(
                 invited_by=invited_by,
                 region=region,
                 level=level,
-                gender=gender,
-                card_number=card_number,
-                card_holder_full_name=card_holder_name,
+                gender=gender
             )
             if updated:
                 return await sync_to_async(_get_user_sync)(telegram_id)
@@ -63,9 +59,7 @@ async def create_user(
             invited_by=invited_by,
             region=region,
             level=level,
-            gender=gender,
-            card_number=card_number,
-            card_holder_full_name=card_holder_name,
+            gender=gender
         )
 
         if user:
