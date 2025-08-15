@@ -58,7 +58,6 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
 
         try:
             # Foydalanuvhiga To'langan kursni Private Kanal linkini yuborish
-
             chat_id = instance.user.telegram_id
             message = (
                 f"✅ To'lov muvaffaqiyatli amalga oshirildi!\n"
@@ -83,43 +82,60 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
             }
             response = requests.post(BASE_URL, json=payload)
             response.raise_for_status()
-
-            payment_messsage = (
-                "➡️ Keyingi qadam endi siz sizni bu loyihaga qo'shilishingizga sababchi bo'lgan liderga daromadini tashlab berishingiz kerak\n\n"
-                "💡 Referral tizimi haqida:\n\n"
-                "1️⃣ Siz avval 200,000 so'm to'lovni amalga oshirishingiz kerak\n"
-                "2️⃣ To'lov tasdiqlangach, sizga maxsus referral kod beriladi\n"
-                "3️⃣ Bu kod orqali boshqalarni taklif qilganingizda:\n"
-                "   - Ular ham 200,000 so'm to'lashadi\n"
-                "   - To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal 200 ming so'mdan sizga to'lov qilishadi.\n\n"
-                "💳 To'lov uchun karta ma'lumotlari:\n"
-                f"Telefon raqami: {instance.user.invited_by.phone_number}\n"
-                f"Telegram profili: @{instance.user.invited_by.telegram_username}\n"
-                "To'lov qilganingizdan so'ng pastdagi tugmani bosing:"
-            )
-            referral_payment = async_to_sync(create_referral_payment_request)(
-                user_id=chat_id, 
-                amount=200_000
-            )
-            reply_markup = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="✅ To'lov qildim",
-                            callback_data=f"payment_made_{referral_payment.id}",
-                        )
+            
+           
+            referral_recipient = None
+            
+            if instance.user.invited_by:
+                if instance.user.invited_by.is_admin:
+                    referral_recipient = instance.user.invited_by
+                else:
+                    if instance.user.invited_by.invited_by:
+                        referral_recipient = instance.user.invited_by.invited_by
+            
+        
+            if referral_recipient:
+                payment_message = (
+                    "➡️ Keyingi qadam endi siz sizni bu loyihaga qo'shilishingizga sababchi bo'lgan liderga daromadini tashlab berishingiz kerak\n\n"
+                    "💡 Referral tizimi haqida:\n\n"
+                    "1️⃣ Siz avval 200,000 so'm to'lovni amalga oshirishingiz kerak\n"
+                    "2️⃣ To'lov tasdiqlangach, sizga maxsus referral kod beriladi\n"
+                    "3️⃣ Bu kod orqali boshqalarni taklif qilganingizda:\n"
+                    "   - Ular ham 200,000 so'm to'lashadi\n"
+                    "   - To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal 200 ming so'mdan sizga to'lov qilishadi.\n\n"
+                    "💳 To'lov uchun karta ma'lumotlari:\n"
+                    f"Telefon raqami: {referral_recipient.phone_number}\n"
+                    f"Telegram profili: @{referral_recipient.telegram_username}\n"
+                    "To'lov qilganingizdan so'ng pastdagi tugmani bosing:"
+                )
+                
+                referral_payment = async_to_sync(create_referral_payment_request)(
+                    user_id=chat_id, 
+                    amount=200_000
+                )
+                
+                reply_markup = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="✅ To'lov qildim",
+                                callback_data=f"payment_made_{referral_payment.id}",
+                            )
+                        ]
                     ]
-                ]
-            ).model_dump(exclude_none=True)
+                ).model_dump(exclude_none=True)
 
-            payload = {
-                "chat_id": chat_id,
-                "text": payment_messsage,
-                "reply_markup": reply_markup,
-                "parse_mode": "HTML",
-            }
-            response = requests.post(BASE_URL, json=payload)
-            response.raise_for_status()
+                payload = {
+                    "chat_id": chat_id,
+                    "text": payment_message,
+                    "reply_markup": reply_markup,
+                    "parse_mode": "HTML",
+                }
+                response = requests.post(BASE_URL, json=payload)
+                response.raise_for_status()
+            else:
+                # Agar referral recipient topilmasa (masalan, to'g'ridan-to'g'ri admin tomonidan qo'shilgan)
+                print(f"[WARNING] User {instance.user.telegram_id} uchun referral recipient topilmadi")
 
         except Exception as e:
             print(f"Telegramga yuborishda xatolik: {e}")
