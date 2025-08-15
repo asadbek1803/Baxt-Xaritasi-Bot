@@ -71,12 +71,12 @@ CSRF_TRUSTED_ORIGINS = [
     "http://newlive.uz",
     "https://0aaca1b5a486.ngrok-free.app",
     "http://0aaca1b5a486.ngrok-free.app",
-    "https://bfa02bcc6c2e.ngrok-free.app"
+    "https://d74fed7cf4a7.ngrok-free.app"
 ]
 
 CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = "bfa02bcc6c2e.ngrok-free.app"
-CORS_ORIGIN_WHITELIST = ("https://newlive.uz", "http://newlive.uz","https://bfa02bcc6c2e.ngrok-free.app", "https://0aaca1b5a486.ngrok-free.app", "http://0aaca1b5a486.ngrok-free.app")
+CSRF_COOKIE_DOMAIN = "d74fed7cf4a7.ngrok-free.app"
+CORS_ORIGIN_WHITELIST = ("https://newlive.uz", "http://newlive.uz","https://bfa02bcc6c2e.ngrok-free.app", "https://d74fed7cf4a7.ngrok-free.app", "http://0aaca1b5a486.ngrok-free.app")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # Celery sozlamalari

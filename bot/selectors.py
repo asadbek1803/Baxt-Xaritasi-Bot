@@ -69,9 +69,9 @@ def get_all_admins():
 
 
 @sync_to_async
-def get_all_channels(is_telegram: bool = True):
+def get_all_channels():
     """Barcha majburiy kanallarni olish"""
-    return list(MandatoryChannel.objects.filter(is_active=True, is_telegram=is_telegram))
+    return list(MandatoryChannel.objects.filter(is_active=True))
 
 
 @sync_to_async

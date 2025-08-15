@@ -160,15 +160,15 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
 
         if course:
             text = f"""
-🎯 <b>{level_name} bosqichi</b>
+            🎯 <b>{level_name} bosqichi</b>
 
-Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
+            Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
 
-📚 <b>{course.name}</b>
-💰 Narxi: {course.price:,} so'm
-📖 Ta'rif: {course.description}
+            📚 <b>{course.name}</b>
+            💰 Narxi: {course.price:,} so'm
+            📖 Ta'rif: {course.description}
 
-Kursni sotib olishni xohlaysizmi?
+            Kursni sotib olishni xohlaysizmi?
             """
 
             keyboard_buttons = []

@@ -20,49 +20,89 @@ router = Router()
 
 
 async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> List:
-    """Check user subscriptions to all channels and return unsubscribed ones"""
+    """Foydalanuvchi barcha Telegram kanallarga obuna bo'lganligini tekshiradi va obuna bo'lmaganlarini qaytaradi"""
     not_subscribed = []
 
-    for channel in channels:
-        if not getattr(channel, "telegram_id", None):
-            not_subscribed.append(channel)
-            continue
+    # Faqat Telegram kanallarini tekshiramiz
+    telegram_channels = [ch for ch in channels if ch.is_telegram]
+    
+    for channel in telegram_channels:
+        chat_identifier = None
+        channel_found = False
 
-        try:
-            member = await bot.get_chat_member(channel.telegram_id, user_id)
-            if member.status in ["left", "kicked"]:
-                not_subscribed.append(channel)
-        except (TelegramBadRequest, TelegramForbiddenError) as e:
-            logging.error(f"Bot can't operate in channel {channel.name}: {e}")
-            not_subscribed.append(channel)
-        except Exception as e:
-            logging.error(f"Subscription check error: {e}")
+        # Avval telegram_id bilan urinish
+        if channel.telegram_id:
+            chat_identifier = channel.telegram_id
+            try:
+                member = await bot.get_chat_member(
+                    chat_id=chat_identifier,
+                    user_id=user_id
+                )
+                if member.status in ["left", "kicked"]:
+                    not_subscribed.append(channel)
+                channel_found = True
+                continue  # Muvaffaqiyatli bo'lsa, keyingi kanalga o'tamiz
+                
+            except (TelegramBadRequest, TelegramForbiddenError) as e:
+                logging.warning(f"Telegram ID {channel.telegram_id} bilan xatolik: {e}. Username bilan urinib ko'ramiz.")
+            except Exception as e:
+                logging.warning(f"Telegram ID bilan kutilmagan xatolik: {e}. Username bilan urinib ko'ramiz.")
+
+        # Agar telegram_id ishlamasa yoki yo'q bo'lsa, username bilan urinish
+        if not channel_found and channel.link and channel.link.startswith("https://t.me/"):
+            username = channel.link.split("/")[-1]
+            chat_identifier = "@" + username
+            
+            try:
+                member = await bot.get_chat_member(
+                    chat_id=chat_identifier,
+                    user_id=user_id
+                )
+                if member.status in ["left", "kicked"]:
+                    not_subscribed.append(channel)
+                channel_found = True
+                continue  # Muvaffaqiyatli bo'lsa, keyingi kanalga o'tamiz
+
+            except (TelegramBadRequest, TelegramForbiddenError) as e:
+                logging.error(f"Username @{username} bilan ham xatolik: {e}")
+            except Exception as e:
+                logging.error(f"Username bilan kutilmagan xatolik: {e}")
+
+        # Agar hech qanday identifikator ishlamasa
+        if not channel_found:
+            logging.error(f"Kanal {channel.name} uchun hech qanday to'g'ri identifikator topilmadi")
             not_subscribed.append(channel)
 
     return not_subscribed
 
 
 async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
-    """Handle flow for new users (level 0)"""
+    """
+    Foydalanuvchini leveliga qarab kurs chiqaradi.
+    Agar foydalanuvchi kurs sotib olgan bo'lsa, menyuga yuboradi.
+    """
     user = await get_user(user_id)
     user_level = await get_user_level(telegram_id=user_id)
 
+    # Agar foydalanuvchi allaqachon kurs sotib olgan bo'lsa
     if await get_user_buy_course(telegram_id=user_id):
-        await callback.message.delete()  # Clear previous message
+        await callback.message.delete()
         return await callback.message.answer(
             text=Messages.welcome_message.value.format(full_name=hbold(user.full_name)),
             reply_markup=get_menu_keyboard(),
             parse_mode="HTML"
         )
 
+    # Level bo'yicha kursni olish
     course = await get_level_kurs(level=user_level)
     if not course:
         await callback.message.delete()
         return await callback.message.answer(
-            text="⚠️ Hozircha sizga mos kurs topilmadi. Iltimos, keyinroq urinib ko'ring.",
+            text="⚠️ Sizning levelingizga mos kurs hozircha mavjud emas. Keyinroq urinib ko'ring.",
             reply_markup=get_menu_keyboard(),
         )
 
+    # Kurs haqida ma'lumot chiqarish
     text = (
         f"🎓 {hbold(course.name)}\n\n"
         f"{course.description}\n\n"
@@ -84,6 +124,11 @@ async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
 
 @router.callback_query(F.data == "check_subscription")
 async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
+    """
+    Foydalanuvchi kanallarni tekshiradi.
+    Agar obuna bo'lmagan Telegram kanali bo'lsa — ro'yxatni chiqaradi.
+    Aks holda — leveliga qarab kurs yoki menyuga yo'naltiradi.
+    """
     user_id = callback.from_user.id
 
     try:
@@ -91,6 +136,7 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
         not_subscribed = await check_user_subscriptions(bot, user_id, channels)
 
         if not_subscribed:
+            # Obuna bo'lmagan Telegram kanallar ro'yxati
             channels_list = "\n".join(
                 f"➖ {channel.name}" for channel in not_subscribed if channel.name
             )
@@ -107,16 +153,17 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
             )
 
             await callback.message.answer(
-                f"❗️ Quyidagi kanal(lar)ga a'zo bo'lishingiz kerak:\n\n"
+                f"❗️ Quyidagi majburiy Telegram kanal(lar)ga obuna bo'lishingiz kerak:\n\n"
                 f"{channels_list}\n\n"
-                f"A'zo bo'lgach, «🔄 A'zolikni tekshirish» tugmasini bosing.",
+                f"Obuna bo'lgach, «🔄 A'zolikni tekshirish» tugmasini bosing.",
                 reply_markup=keyboard,
             )
         else:
+            # Agar hamma majburiy kanallarga obuna bo'lsa → yangi oqim
             await handle_new_user_flow(callback, user_id)
 
     except Exception as e:
-        logging.error(f"Subscription check error: {e}")
+        logging.error(f"A'zolikni tekshirishda umumiy xatolik: {e}")
         await callback.message.answer(
             "⚠️ A'zolikni tekshirishda xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
             reply_markup=get_menu_keyboard(),
