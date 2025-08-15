@@ -18,9 +18,9 @@ from bot.buttons.inline.stages import get_stages_keyboard
 router = Router()
 
 
-# 0. Check if user has username before starting registration
+# 1. Ism familya olish
 @router.message(UserRegistrationState.GET_FULL_NAME)
-async def check_username_before_registration(message: types.Message, state: FSMContext):
+async def get_full_name(message: types.Message, state: FSMContext):
     if not message.from_user.username:
         await message.answer("❌ Iltimos, avval Telegram profilingizga username qo'ying!")
         return
@@ -31,13 +31,64 @@ async def check_username_before_registration(message: types.Message, state: FSMC
         return
 
     await state.update_data(full_name=full_name)
+    await message.answer(
+        Messages.ask_phone_number.value,
+        reply_markup=get_phone_keyboard(text=Button.send_phone_number.value),
+    )
+    await state.set_state(UserRegistrationState.GET_PHONE_NUMBER)
+
+
+# 2. Telefon raqamini olish (contact)
+@router.message(UserRegistrationState.GET_PHONE_NUMBER, F.contact)
+async def get_phone_contact(message: types.Message, state: FSMContext):
+    phone_number = message.contact.phone_number
+    if not phone_number.startswith("+"):
+        phone_number = "+" + phone_number
+    await state.update_data(phone_number=phone_number)
+    await message.answer(
+        Messages.ask_gender.value, 
+        reply_markup=get_gender_keyboard()
+    )
+    await state.set_state(UserRegistrationState.GET_GENDER)
+
+
+# 3. Telefon raqamini olish (matn)
+@router.message(UserRegistrationState.GET_PHONE_NUMBER, F.text)
+async def get_phone_text(message: types.Message, state: FSMContext):
+    phone_number = format_phone_number(message.text.strip())
+    if not phone_number:
+        await message.answer(
+            Messages.phone_number_error.value,
+            reply_markup=get_phone_keyboard(text=Button.send_phone_number.value),
+        )
+        return
+    await state.update_data(phone_number=phone_number)
+    await message.answer(
+        Messages.ask_gender.value, 
+        reply_markup=get_gender_keyboard()
+    )
+    await state.set_state(UserRegistrationState.GET_GENDER)
+
+
+# 4. Jins tanlash
+@router.message(UserRegistrationState.GET_GENDER)
+async def get_gender(message: types.Message, state: FSMContext):
+    gender_name = message.text.strip().title()
+    gender_code = get_gender_code_by_name(gender_name)
     
-    # Skip card information and go directly to age selection
+    if not gender_code:
+        await message.answer(
+            Messages.gender_error.value, 
+            reply_markup=get_gender_keyboard()
+        )
+        return
+
+    await state.update_data(gender=gender_code)
     await message.answer("Yoshingizni tanlang:", reply_markup=get_age_button())
     await state.set_state(UserRegistrationState.GET_AGE)
 
 
-# 1. Yoshni olish
+# 5. Yoshni olish
 @router.callback_query(UserRegistrationState.GET_AGE, F.data.startswith("age_"))
 async def process_age_callback(callback: types.CallbackQuery, state: FSMContext):
     age_map = {"18_24": "18-24", "25_34": "25-34", "35_44": "35-44", "45_plus": "45+"}
@@ -59,40 +110,11 @@ async def process_age_callback(callback: types.CallbackQuery, state: FSMContext)
         await callback.message.answer(f"✅ Yosh: <b>{age_value}</b>", parse_mode="HTML")
 
     await callback.answer()
-    await callback.message.answer(
-        Messages.ask_phone_number.value,
-        reply_markup=get_phone_keyboard(text=Button.send_phone_number.value),
-    )
-    await state.set_state(UserRegistrationState.GET_PHONE_NUMBER)
-
-
-# 2. Telefon raqamini olish (contact)
-@router.message(UserRegistrationState.GET_PHONE_NUMBER, F.contact)
-async def get_phone_contact(message: types.Message, state: FSMContext):
-    phone_number = message.contact.phone_number
-    if not phone_number.startswith("+"):
-        phone_number = "+" + phone_number
-    await state.update_data(phone_number=phone_number)
-    await message.answer(Messages.ask_region.value, reply_markup=get_region_buttons())
+    await callback.message.answer(Messages.ask_region.value, reply_markup=get_region_buttons())
     await state.set_state(UserRegistrationState.GET_REGION)
 
 
-# 3. Telefon raqamini olish (matn)
-@router.message(UserRegistrationState.GET_PHONE_NUMBER, F.text)
-async def get_phone_text(message: types.Message, state: FSMContext):
-    phone_number = format_phone_number(message.text.strip())
-    if not phone_number:
-        await message.answer(
-            Messages.phone_number_error.value,
-            reply_markup=get_phone_keyboard(text=Button.send_phone_number.value),
-        )
-        return
-    await state.update_data(phone_number=phone_number)
-    await message.answer(Messages.ask_region.value, reply_markup=get_region_buttons())
-    await state.set_state(UserRegistrationState.GET_REGION)
-
-
-# 4. Region tanlash
+# 6. Manzil (Region) tanlash
 @router.callback_query(UserRegistrationState.GET_REGION, F.data.startswith("region_"))
 async def process_region_callback(callback: types.CallbackQuery, state: FSMContext):
     region_code = callback.data.split("_", 1)[1]
@@ -121,9 +143,9 @@ async def process_region_callback(callback: types.CallbackQuery, state: FSMConte
     await state.set_state(UserRegistrationState.GET_PROFESSION)
 
 
-# 5. Kasb tanlash
+# 7. Kasb tanlash va registratsiyani yakunlash
 @router.callback_query(UserRegistrationState.GET_PROFESSION, F.data.startswith("profession_"))
-async def process_profession_callback(callback: types.CallbackQuery, state: FSMContext):
+async def process_profession_callback(callback: types.CallbackQuery, state: FSMContext, bot: Bot):
     profession_code = callback.data.split("_", 1)[1]
     profession_name = next(
         (name for code, name in PROFESSIONS if code == profession_code), None
@@ -146,31 +168,19 @@ async def process_profession_callback(callback: types.CallbackQuery, state: FSMC
         )
 
     await callback.answer()
-    await callback.message.answer(
-        Messages.ask_gender.value, reply_markup=get_gender_keyboard()
-    )
-    await state.set_state(UserRegistrationState.GET_GENDER)
+
+    # Registratsiyani yakunlash
+    await complete_registration(callback.message, state, callback.from_user.id, callback.from_user.username)
 
 
-# 6. Jins tanlash va foydalanuvchini yaratish
-@router.message(UserRegistrationState.GET_GENDER)
-async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
-    gender_name = message.text.strip().title()
-    gender_code = get_gender_code_by_name(gender_name)
-    user_id = message.from_user.id
-    
-    if not gender_code:
-        await message.answer(
-            Messages.gender_error.value, reply_markup=get_gender_keyboard()
-        )
+# Registratsiyani yakunlash funksiyasi
+async def complete_registration(message: types.Message, state: FSMContext, user_id: int, username: str):
+    # Username tekshirish
+    if not username:
+        await message.answer("❌ Iltimos, avval Telegram profilingizga username qo'ying!")
         return
 
     data = await state.get_data()
-
-    # Check username again before completing registration
-    if not message.from_user.username:
-        await message.answer("❌ Iltimos, avval Telegram profilingizga username qo'ying!")
-        return
 
     referral_code = data.get("referral_code", None)
     invited_by_user = None
@@ -183,18 +193,17 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
 
     try:
         user = await create_user(
-            telegram_id=str(message.from_user.id),
+            telegram_id=str(user_id),
             phone_number=data["phone_number"],
             full_name=data["full_name"],
-            telegram_username=message.from_user.username,
+            telegram_username=username,
             profession=data["profession"],
             region=get_region_code_by_name(data["region"]),
-            gender=gender_code,
+            gender=data["gender"],
             referral_code=None,
             invited_by=invited_by_user,
             level="level_0",
             age=data.get("age"),
-            # Removed card_number and card_holder_name fields
         )
 
         if not user:
