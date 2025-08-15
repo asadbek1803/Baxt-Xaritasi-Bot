@@ -17,7 +17,7 @@ async def create_user(
     referral_code: str = None,  # refferal_code o'rniga referral_code
     invited_by: TelegramUser = None,  # refferal_user o'rniga invited_by
     region: str = None,
-    level: str = None,
+    level: str = "level_0",
     gender: str = None
 ) -> TelegramUser:
     """

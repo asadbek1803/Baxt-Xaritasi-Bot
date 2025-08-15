@@ -192,6 +192,7 @@ async def get_gender(message: types.Message, state: FSMContext, bot: Bot):
             gender=gender_code,
             referral_code=None,
             invited_by=invited_by_user,
+            level="level_0",
             age=data.get("age"),
             # Removed card_number and card_holder_name fields
         )
