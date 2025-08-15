@@ -271,7 +271,7 @@ def get_level_kurs(level):
         
         # Kursni topish
         course = Kurslar.objects.filter(
-            is_active=True, 
+            is_active=True,
             level=course_level
         ).first()
         

@@ -48,7 +48,7 @@ def get_stages_keyboard(
 
         # Bu levelga kirish huquqi bormi?
         # Mantiq: sotib olingan levellar + keyingi bitta level ochiq
-        can_access = level_num == max_purchased_level + 1
+        can_access = level_num == current_level + 1
         print(can_access)
         print(f"Level {level_num}: purchased={is_purchased}, can_access={can_access}")
 
