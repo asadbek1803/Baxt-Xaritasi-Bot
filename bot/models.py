@@ -301,7 +301,7 @@ class ReferralPayment(models.Model):
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default="PENDING", verbose_name="Holati"
     )
-    screenshot = models.CharField(max_length=500, blank=True, null=True)
+    screenshot = models.ImageField(upload_to="referral", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     confirmed_by = models.ForeignKey(
