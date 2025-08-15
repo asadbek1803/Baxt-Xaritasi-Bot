@@ -68,7 +68,7 @@ class ChannelMembershipMiddleware(BaseMiddleware):
         telegram_channels = [ch for ch in channels if ch.is_telegram]
         other_channels = [ch for ch in channels if not ch.is_telegram]
 
-        # 🔹 Avval Telegram kanallarini tekshiramiz
+        # 🔹 Faqat Telegram kanallarini tekshiramiz (majburiy a'zolik uchun)
         for channel in telegram_channels:
             chat_identifier = None
 
@@ -105,76 +105,85 @@ class ChannelMembershipMiddleware(BaseMiddleware):
 
                 except (TelegramBadRequest, TelegramForbiddenError) as e:
                     logging.error(f"Username @{username} bilan ham xatolik: {e}")
+                    # API xatoligi bo'lsa, kanalga a'zo emas deb hisoblaymiz
+                    not_subscribed_channels.append(channel)
                 except Exception as e:
                     logging.error(f"Username bilan kutilmagan xatolik: {e}")
-
-            # Agar hech qanday identifikator ishlamasa
-            if chat_identifier is None or not_subscribed_channels or len([ch for ch in not_subscribed_channels if ch.name == channel.name]) == 0:
+                    not_subscribed_channels.append(channel)
+            else:
+                # Agar hech qanday identifikator yo'q bo'lsa
                 logging.error(f"Kanal {channel.name} uchun hech qanday to'g'ri identifikator topilmadi")
                 not_subscribed_channels.append(channel)
 
-        # 🔹 Agar foydalanuvchi hamma Telegram kanallariga a'zo bo'lsa
-        if not not_subscribed_channels:
-            # Telegram kanallarga a'zo ✅
-            # Boshqa platformalar (YouTube, Instagram, ...) faqat tugma ko'rinadi, lekin bloklamaydi
-            if other_channels:
-                await self.send_subscription_message(message, other_channels, only_buttons=True)
-            return await handler(event, data)
+        # 🔹 Agar Telegram kanallaridan birortasiga a'zo bo'lmasa - foydalanuvchini bloklash
+        if not_subscribed_channels:
+            await self.send_subscription_message(message, not_subscribed_channels, other_channels)
+            return  # Handler'ni to'xtatamiz
 
-        # Agar hali Telegram kanallaridan chiqib ketgan bo'lsa → bloklash
-        # Boshqa platformadagi kanallarni ham ko'rsatish (lekin bloklamaydi)
-        await self.send_subscription_message(message, not_subscribed_channels + other_channels, block_user=True)
-        return
+        # 🔹 Agar hamma Telegram kanallariga a'zo bo'lsa - handler'ni davom ettirish
+        return await handler(event, data)
 
-    async def send_subscription_message(self, message: Message, channels: list, only_buttons: bool = False, block_user: bool = False):
+    async def send_subscription_message(
+        self, 
+        message: Message, 
+        not_subscribed_telegram_channels: list,
+        other_channels: list = None
+    ):
         try:
-            if block_user:
-                base_message = getattr(
-                    Messages.do_member_in_channel,
-                    "value",
-                    "📢 Botdan foydalanish uchun quyidagi majburiy kanallarga a'zo bo'ling:",
-                )
-            else:
-                base_message = "🌐 Qo'shimcha homiy kanallar:"
-
-            text = base_message + "\n\n"
+            if other_channels is None:
+                other_channels = []
+                
+            text = getattr(
+                Messages.do_member_in_channel,
+                "value",
+                "📢 Botdan foydalanish uchun quyidagi majburiy kanallarga a'zo bo'ling:\n\n",
+            )
+            
             keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-
-            if channels:
-                for channel in channels:
+            
+            # Majburiy Telegram kanallarini ko'rsatamiz
+            for channel in not_subscribed_telegram_channels:
+                username = html.escape(channel.name or "Kanal")
+                link = getattr(channel, "link", None)
+                button_text = f"📢 {username}"
+                
+                if link:
+                    keyboard.inline_keyboard.append(
+                        [InlineKeyboardButton(text=button_text, url=str(link))]
+                    )
+                    text += f"{button_text}\n"
+            
+            # Qo'shimcha platformalar (agar mavjud bo'lsa)
+            if other_channels:
+                text += "\n🌐 Qo'shimcha homiy kanallar:\n"
+                for channel in other_channels:
                     username = html.escape(channel.name or "Kanal")
                     link = getattr(channel, "link", None)
-
-                    if channel.is_telegram:
-                        button_text = f"📢 {username}"  # Telegram kanali
-                    else:
-                        button_text = f"🌐 {username}"  # Boshqa platforma
-
+                    button_text = f"🌐 {username}"
+                    
                     if link:
                         keyboard.inline_keyboard.append(
                             [InlineKeyboardButton(text=button_text, url=str(link))]
                         )
                         text += f"{button_text}\n"
-                    else:
-                        text += f"{button_text}\n"
-
-            # Faqat bloklangan holatda "A'zolikni tekshirish" tugmasi ko'rinadi
-            if block_user and not only_buttons:
-                keyboard.inline_keyboard.append(
-                    [
-                        InlineKeyboardButton(
-                            text="✅ A'zolikni tekshirish",
-                            callback_data="check_subscription",
-                        )
-                    ]
-                )
-                text += "\n💡 <b>Majburiy kanallarga a'zo bo'lgandan so'ng 'A'zolikni tekshirish' tugmasini bosing!</b>"
-
+            
+            # Tekshirish tugmasini qo'shamiz
+            keyboard.inline_keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        text="✅ A'zolikni tekshirish",
+                        callback_data="check_subscription",
+                    )
+                ]
+            )
+            text += "\n💡 <b>Majburiy kanallarga a'zo bo'lgandan so'ng 'A'zolikni tekshirish' tugmasini bosing!</b>"
+            
             await message.answer(
                 text,
                 parse_mode="HTML",
                 reply_markup=keyboard,
             )
+                
         except Exception as e:
             logging.error(f"Xabar yuborishda xatolik: {e}")
             await message.answer(

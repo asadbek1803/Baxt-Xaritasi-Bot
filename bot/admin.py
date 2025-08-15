@@ -19,11 +19,220 @@ from .models import (
 )
 
 
+from django.contrib import admin
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+from django.urls import reverse
+from django.conf import settings
+import os
+
+
 @admin.register(ReferralPayment)
 class ReferralPaymentAdmin(ModelAdmin):
-    list_display = ("user", "amount", "status", "created_at")
-    search_fields = ("user__username", "amount", "status")
-    list_filter = ("status", "created_at")
+    list_display = (
+        "id",
+        "user_short_info",
+        "amount_display",
+        "status_display",
+        "screenshot_thumbnail",
+        "created_at_short",
+    )
+    
+    list_display_links = ("id", "user_short_info")
+    
+    search_fields = (
+        "user__full_name",
+        "user__telegram_id",
+        "user__phone_number",
+        "amount",
+    )
+    
+    list_filter = (
+        "status",
+        "created_at",
+    )
+    
+    readonly_fields = (
+        "user_full_info",
+        "payment_details",
+        "screenshot_preview",
+        "created_at",
+        "confirmed_at",
+    )
+    
+    fieldsets = (
+        ("Asosiy ma'lumotlar", {
+            "fields": ("user", "amount", "status")
+        }),
+        ("Screenshot", {
+            "fields": ("screenshot", "screenshot_preview"),
+            "classes": ("collapse",)
+        }),
+        ("Qo'shimcha ma'lumotlar", {
+            "fields": ("user_full_info", "payment_details"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    actions = ["confirm_selected", "reject_selected"]
+    
+    # List view methods
+    def user_short_info(self, obj):
+        if not obj.user:
+            return "Noma'lum"
+        
+        return format_html(
+            "<div style='min-width: 150px;'>"
+            "<strong>{}</strong><br>"
+            "<small>ID: {}</small><br>"
+            "<small>📞 {}</small>"
+            "</div>",
+            obj.user.full_name or "Noma'lum",
+            obj.user.telegram_id,
+            obj.user.phone_number or "—"
+        )
+    user_short_info.short_description = "Foydalanuvchi"
+    
+    def amount_display(self, obj):
+        formatted_amount = f"{obj.amount:,}"
+        color = "#28a745" if obj.status == "CONFIRMED" else "#dc3545" if obj.status == "REJECTED" else "#ffc107"
+        return format_html(
+            "<span style='font-weight: bold; color: {};'>{}</span>",
+            color,
+            f"{formatted_amount} so'm"
+        )
+    amount_display.short_description = "Miqdor"
+    
+    def status_display(self, obj):
+        status_map = {
+            "PENDING": ("Kutilmoqda", "#ffc107"),
+            "CONFIRMED": ("Tasdiqlandi", "#28a745"),
+            "REJECTED": ("Rad etildi", "#dc3545"),
+            "CANCELLED": ("Bekor qilindi", "#6c757d"),
+        }
+        
+        text, color = status_map.get(obj.status, (obj.status, "#6c757d"))
+        return format_html(
+            "<span style='display: inline-block; padding: 3px 8px; "
+            "border-radius: 12px; background-color: {}; color: white; "
+            "font-size: 12px; font-weight: bold;'>{}</span>",
+            color, text
+        )
+    status_display.short_description = "Holati"
+    
+    def screenshot_thumbnail(self, obj):
+        if not obj.screenshot:
+            return format_html("<span style='color: #6c757d;'>—</span>")
+        
+        if isinstance(obj.screenshot, str) and not obj.screenshot.startswith('AgAC'):
+            file_path = os.path.join(settings.MEDIA_ROOT, obj.screenshot)
+            if os.path.exists(file_path):
+                url = f"{settings.MEDIA_URL}{obj.screenshot}"
+                return format_html(
+                    "<a href='{}' target='_blank' style='display: inline-block;'>"
+                    "<img src='{}' style='height: 40px; width: 40px; object-fit: cover; "
+                    "border-radius: 4px; border: 1px solid #ddd;'/></a>",
+                    url, url
+                )
+        
+        return format_html(
+            "<span style='color: #007bff;'>📷 Telegram file</span>"
+        )
+    screenshot_thumbnail.short_description = "Chek"
+    
+    def created_at_short(self, obj):
+        return obj.created_at.strftime("%d.%m.%Y %H:%M")
+    created_at_short.short_description = "Sana"
+    
+    # Detail view methods
+    def user_full_info(self, obj):
+        if not obj.user:
+            return "Ma'lumot yo'q"
+            
+        return format_html(
+            "<div style='background: #f8f9fa; padding: 12px; border-radius: 6px;'>"
+            "<h4 style='margin-top: 0;'>Foydalanuvchi ma'lumotlari</h4>"
+            "<p><strong>To'liq ism:</strong> {}</p>"
+            "<p><strong>Telegram ID:</strong> {}</p>"
+            "<p><strong>Telefon:</strong> {}</p>"
+            "<p><strong>Username:</strong> {}</p>"
+            "<p><strong>Holati:</strong> {}</p>"
+            "<p><strong>Referral kodi:</strong> {}</p>"
+            "</div>",
+            obj.user.full_name or "—",
+            obj.user.telegram_id,
+            obj.user.phone_number or "—",
+            f"@{obj.user.telegram_username}" if obj.user.telegram_username else "—",
+            "✅ Tasdiqlangan" if obj.user.is_confirmed else "❌ Tasdiqlanmagan",
+            obj.user.referral_code or "—"
+        )
+    user_full_info.short_description = "Foydalanuvchi ma'lumotlari"
+    
+    def payment_details(self, obj):
+        return format_html(
+            "<div style='background: #f8f9fa; padding: 12px; border-radius: 6px;'>"
+            "<h4 style='margin-top: 0;'>To'lov tafsilotlari</h4>"
+            "<p><strong>ID:</strong> {}</p>"
+            "<p><strong>Miqdor:</strong> {:,} so'm</p>"
+            "<p><strong>Holati:</strong> {}</p>"
+            "<p><strong>Yaratilgan:</strong> {}</p>"
+            "<p><strong>Yangilangan:</strong> {}</p>"
+            "</div>",
+            obj.id,
+            obj.amount,
+            self.status_display(obj),
+            obj.created_at.strftime("%d.%m.%Y %H:%M:%S"),
+            obj.confirmed_at.strftime("%d.%m.%Y %H:%M:%S") if obj.updated_at else "—"
+        )
+    payment_details.short_description = "To'lov ma'lumotlari"
+    
+    def screenshot_preview(self, obj):
+        if not obj.screenshot:
+            return format_html(
+                "<div style='text-align: center; color: #6c757d; padding: 20px;'>"
+                "Screenshot yuklanmagan"
+                "</div>"
+            )
+            
+        if isinstance(obj.screenshot, str) and not obj.screenshot.startswith('AgAC'):
+            file_path = os.path.join(settings.MEDIA_ROOT, obj.screenshot)
+            if os.path.exists(file_path):
+                url = f"{settings.MEDIA_URL}{obj.screenshot}"
+                return format_html(
+                    "<div style='text-align: center;'>"
+                    "<a href='{}' target='_blank'>"
+                    "<img src='{}' style='max-width: 100%; max-height: 400px; "
+                    "border-radius: 8px; border: 1px solid #ddd;'/></a>"
+                    "<p style='color: #6c757d;'>Kattaroq ko'rish uchun rasmga bosing</p>"
+                    "</div>",
+                    url, url
+                )
+        
+        return format_html(
+            "<div style='text-align: center; padding: 20px; color: #007bff;'>"
+            "📷 Telegram fayl ID: <code style='word-break: break-all;'>{}</code><br>"
+            "<small style='color: #dc3545;'>Admin panelda ko'rsatib bo'lmaydi</small>"
+            "</div>",
+            obj.screenshot
+        )
+    screenshot_preview.short_description = "Screenshot"
+    
+    # Admin actions
+    def confirm_selected(self, request, queryset):
+        updated = queryset.filter(status="PENDING").update(status="CONFIRMED")
+        self.message_user(request, f"{updated} ta to'lov tasdiqlandi")
+    confirm_selected.short_description = "Tanlanganlarni tasdiqlash"
+    
+    def reject_selected(self, request, queryset):
+        updated = queryset.filter(status="PENDING").update(status="REJECTED")
+        self.message_user(request, f"{updated} ta to'lov rad etildi")
+    reject_selected.short_description = "Tanlanganlarni rad etish"
+    
+    # Optimize queries
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user")
+    # Admin actions
+    
 
 
 # PrivateChannel Inline - Konkurs ichida qo'shish uchun

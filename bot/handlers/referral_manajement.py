@@ -1,12 +1,16 @@
 import asyncio
+import os
+
 from functools import wraps
-from aiogram import types, F, Router
+from datetime import datetime
+from aiogram import types, F, Router, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardMarkup, InlineKeyboardButton
 from bot.models import TelegramUser, ReferralPayment
 from bot.selectors import create_referral_payment_request, get_root_referrer
 from bot.buttons.default.back import get_back_keyboard
+from core.settings import MEDIA_ROOT
 from asgiref.sync import sync_to_async
 
 router = Router()
@@ -175,11 +179,17 @@ async def process_referral_payment_screenshot(
             await state.clear()
             return
 
-        # Process screenshot and save
+        # Process screenshot and save to file
         photo = message.photo[-1]
         try:
+            # Rasmni fayl sifatida saqlash
+            screenshot_path = await save_payment_screenshot(
+                message.bot, photo, str(message.from_user.id)
+            )
+            
+            # Payment obyektiga yo'lni saqlash
             if hasattr(payment, "screenshot"):
-                payment.screenshot = photo.file_id
+                payment.screenshot = screenshot_path
             payment.status = "PENDING"
             await sync_to_async(payment.save)()
         except Exception as e:
@@ -372,3 +382,18 @@ async def reject_referral_payment(callback: types.CallbackQuery):
     except Exception as e:
         print(f"[reject_referral] Unexpected error: {e}")
         await callback.answer("❌ Kutilmagan xatolik yuz berdi!", show_alert=True)
+
+# Screenshot saqlash funksiyasi (o'zgarishlarsiz)
+async def save_payment_screenshot(bot: Bot, photo: types.PhotoSize, user_id: str) -> str:
+    file = await bot.get_file(photo.file_id)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"referral_payment_{user_id}_{timestamp}.jpg"
+
+    save_dir = os.path.join(MEDIA_ROOT, 'referral')
+    os.makedirs(save_dir, exist_ok=True)
+
+    save_path = os.path.join(save_dir, file_name)
+    await bot.download_file(file.file_path, destination=save_path)
+
+    # DB ga nisbiy yo'lni qaytaramiz
+    return os.path.join('referral', file_name)

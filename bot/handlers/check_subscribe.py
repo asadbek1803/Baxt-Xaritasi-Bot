@@ -65,10 +65,15 @@ async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> Li
 
             except (TelegramBadRequest, TelegramForbiddenError) as e:
                 logging.error(f"Username @{username} bilan ham xatolik: {e}")
+                # API xatoligi bo'lsa, a'zo emas deb hisoblaymiz
+                not_subscribed.append(channel)
+                channel_found = True
             except Exception as e:
                 logging.error(f"Username bilan kutilmagan xatolik: {e}")
+                not_subscribed.append(channel)
+                channel_found = True
 
-        # Agar hech qanday identifikator ishlamasa
+        # Agar hech qanday identifikator yo'q bo'lsa
         if not channel_found:
             logging.error(f"Kanal {channel.name} uchun hech qanday to'g'ri identifikator topilmadi")
             not_subscribed.append(channel)
@@ -126,7 +131,7 @@ async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
 async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
     """
     Foydalanuvchi kanallarni tekshiradi.
-    Agar obuna bo'lmagan Telegram kanali bo'lsa — ro'yxatni chiqaradi.
+    Agar obuna bo'lmagan Telegram kanali bo'lsa — callback orqali ogohlantiradi.
     Aks holda — leveliga qarab kurs yoki menyuga yo'naltiradi.
     """
     user_id = callback.from_user.id
@@ -136,35 +141,14 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
         not_subscribed = await check_user_subscriptions(bot, user_id, channels)
 
         if not_subscribed:
-            # Obuna bo'lmagan Telegram kanallar ro'yxati
-            channels_list = "\n".join(
-                f"➖ {channel.name}" for channel in not_subscribed if channel.name
-            )
-
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="🔄 A'zolikni tekshirish",
-                            callback_data="check_subscription",
-                        )
-                    ]
-                ]
-            )
-
-            await callback.message.answer(
-                f"❗️ Quyidagi majburiy Telegram kanal(lar)ga obuna bo'lishingiz kerak:\n\n"
-                f"{channels_list}\n\n"
-                f"Obuna bo'lgach, «🔄 A'zolikni tekshirish» tugmasini bosing.",
-                reply_markup=keyboard,
-            )
+            # Callback orqali ogohlantirish
+            await callback.answer("❌ Siz barcha kanallarimizga a'zo bo'lmagansiz!", show_alert=True)
+            return
         else:
-            # Agar hamma majburiy kanallarga obuna bo'lsa → yangi oqim
+            # Hamma majburiy kanallarga a'zo bo'lsa → yangi oqim
+            await callback.answer("✅ A'zolik tasdiqlandi!", show_alert=False)
             await handle_new_user_flow(callback, user_id)
 
     except Exception as e:
         logging.error(f"A'zolikni tekshirishda umumiy xatolik: {e}")
-        await callback.message.answer(
-            "⚠️ A'zolikni tekshirishda xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.",
-            reply_markup=get_menu_keyboard(),
-        )
+        await callback.answer("⚠️ A'zolikni tekshirishda xatolik yuz berdi!", show_alert=True)
