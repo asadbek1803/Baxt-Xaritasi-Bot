@@ -1,316 +1,102 @@
+# stages.py - Tuzatilgan handler
+
 from aiogram import types, Router, F
-from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot.buttons.default.menu import get_menu_keyboard
 from bot.selectors import (
+    fetch_user,
     get_user,
     get_user_level,
-    get_user_active_payments,
     get_level_kurs,
-    LEVEL_MAPPING,
-    REVERSE_LEVEL_MAPPING,
-    get_user_purchased_courses_with_levels
+    get_user_purchased_courses_with_levels,
 )
 
 router = Router()
-global msg
 
-def get_stages_keyboard(user_level: str, purchased_course_levels: set) -> InlineKeyboardMarkup:
-    """
-    Foydalanuvchi leveliga va sotib olgan kurslar levellariga qarab bosqichlar klaviaturasini yaratish
-    """
+
+def get_stages_keyboard(
+    user_level: str, purchased_course_levels: set
+) -> InlineKeyboardMarkup:
     keyboard_buttons = []
 
-    # Foydalanuvchining hozirgi level raqamini olish
+    # Foydalanuvchi bosqich raqamini to'g'ri olish
     try:
-        current_level_num = int(user_level.split('-')[0])
-    except (ValueError, AttributeError):
-        current_level_num = 0
+        if user_level.startswith("level_"):
+            current_level = int(user_level.split("_")[1])
+        elif "-bosqich" in user_level:
+            current_level = int(user_level.split("-")[0])
+        else:
+            current_level = 0
+    except:
+        current_level = 0
 
-    # 7 ta bosqich uchun tugmalar yaratish
-    for level_num in range(1, 8):  # 1 dan 7 gacha
+    print(f"User current level: {current_level}")
+    print(f"Purchased course levels: {purchased_course_levels}")
+
+    # Eng yuqori sotib olingan levelni topish
+    max_purchased_level = max(purchased_course_levels) if purchased_course_levels else 0
+
+    print(f"Max purchased level: {max_purchased_level}")
+
+    # 1 dan 7 gacha bosqichlar uchun tugmalar
+    for level_num in range(1, 8):
         level_name = f"{level_num}-bosqich"
 
-        # Tugma matni va holatini aniqlash
-        if level_num in purchased_course_levels:
-            button_text = f"✅ {level_name}"
-            callback_data = f"stage_completed_{level_num}"
-        elif level_num <= current_level_num:
+        # Kursni sotib olganmi?
+        is_purchased = level_num in purchased_course_levels
+
+        # Bu levelga kirish huquqi bormi?
+        # Mantiq: sotib olingan levellar + keyingi bitta level ochiq
+        can_access = level_num == current_level + 1
+        print(can_access)
+        print(f"Level {level_num}: purchased={is_purchased}, can_access={can_access}")
+
+        if can_access:
+            # Sotib olinmagan lekin ochiq
             button_text = f"🔓 {level_name}"
             callback_data = f"stage_available_{level_num}"
-        elif level_num == current_level_num + 1:
-            button_text = f"🔐 {level_name}"
-            callback_data = f"stage_next_{level_num}"
+        elif is_purchased:
+            # Sotib olingan kurs - doimo yashil
+            button_text = f"✅ {level_name}"
+            callback_data = f"stage_completed_{level_num}"
         else:
+            # Qulflangan
             button_text = f"🔒 {level_name}"
             callback_data = f"stage_locked_{level_num}"
 
-        # Tugma qo'shish
-        keyboard_buttons.append([
-            InlineKeyboardButton(
-                text=button_text,
-                callback_data=callback_data
-            )
-        ])
-    
-    keyboard_buttons.append([
-        InlineKeyboardButton(
-            text="◀️ Orqaga",
-            callback_data="back_to_home"
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text=button_text, callback_data=callback_data)]
         )
-    ])
+
+    keyboard_buttons.append(
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data="back_to_home")]
+    )
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
 
 @router.message(F.text == "⚡️ Bosqichlar")
 async def show_stages(message: types.Message, state: FSMContext):
-    """
-    Bosqichlar haqida ma'lumot ko'rsatish
-    """
+    """Bosqichlar haqida ma'lumot ko'rsatish"""
     user_id = str(message.from_user.id)
-    
+
     # Foydalanuvchini olish
     user = await get_user(user_id)
     if not user:
-        await message.answer("❌ Foydalanuvchi topilmadi. Iltimos /start buyrug'ini bosing.")
-        return
-    
-    # Foydalanuvchi levelini olish
-    user_level = await get_user_level(user_id)
-    if not user_level:
-        user_level = "0-bosqich"  # Default level
-    
-    # Foydalanuvchi sotib olgan kurslar levellarini olish
-    purchased_course_levels = await get_user_purchased_courses_with_levels(user_id)
-    
-    # Bosqichlar haqida matn
-    text = f"""
-🎯 <b>Bosqichlar</b>
-
-Sizning hozirgi darajangiz: <b>{user_level}</b>
-
-<b>Bosqichlar haqida:</b>
-✅ - Tugallangan bosqich (kurs sotib olingan)
-🔓 - Ochiq bosqich (kurs sotib olinmagan)
-🔐 - Keyingi bosqich (sotib olish mumkin)
-🔒 - Yopiq bosqich (avval oldingi bosqichni tugating)
-
-<b>Qoidalar:</b>
-• Har bir bosqichni ketma-ket o'tishingiz kerak
-• Keyingi bosqichga o'tish uchun oldingi bosqichdagi kursni sotib olishingiz kerak
-• Bosqichlarni saklab o'ta olmaysiz
-    """
-    
-    keyboard = get_stages_keyboard(user_level, purchased_course_levels)
-    
-    msg = await message.answer(
-        text,
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
-
-@router.callback_query(F.data.startswith("stage_"))
-async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext):
-    """
-    Bosqich tugmalarini boshqarish
-    """
-    user_id = str(callback.from_user.id)
-    action_data = callback.data.split("_")
-    user = await get_user(user_id)
-    if len(action_data) < 3:
-        await callback.answer("❌ Noto'g'ri ma'lumot")
-        return
-    
-    stage_type = action_data[1]  # completed, available, next, locked
-    level_num = int(action_data[2])
-    level_name = f"{level_num}-bosqich"
-    
-    if stage_type == "completed":
-        # Tugallangan bosqich - ma'lumot ko'rsatish
-        await callback.answer(f"✅ {level_name} bosqichi tugallangan!", show_alert=True)
-        
-    elif stage_type == "available":
-        # Ochiq bosqich (lekin kurs sotib olinmagan) - kurs sotib olishni taklif qilish
-        previous_level = f"{level_num-1}-bosqich"
-        course = await get_level_kurs(previous_level)
-        
-        if course:
-            text = f"""
-                🎯 <b>{level_name} bosqichi</b>
-
-                Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
-
-                📚 <b>{course.name}</b>
-                💰 Narxi: {course.price:,} so'm
-                📖 Ta'rif: {course.description}
-
-                Kursni sotib olishni xohlaysizmi?
-                            """
-            if user.is_confirmed == False:
-                text += "\n\n💡 <b>Referral yaratish orqali ham kurs sotib olishingiz mumkin!</b>"
-                
-                refferal_button = InlineKeyboardButton(
-                    text="📢 Referral yaratish",
-                    callback_data=f"create_referral_{course.id}"
-                )
-                
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [refferal_button]
-                ])
-                
-                await callback.answer(
-                    "💡 Referral yaratish orqali ham kurs sotib olishingiz mumkin!", 
-                    show_alert=True
-                )
-                
-                await callback.message.answer(
-                    text,
-                    reply_markup=keyboard,
-                    parse_mode="HTML"
-                )
-            else:
-
-                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="💳 Sotib olish",
-                                callback_data=f"buy_course_{course.id}"
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                text="◀️ Orqaga",
-                                callback_data="back_to_stages"
-                            )
-                        ]
-                    ])
-                    if user.is_confirmed == False:
-                        keyboard.inline_keyboard.append(
-                        [
-                            InlineKeyboardButton(
-                                text="📢 Referral yaratish",
-                                callback_data=f"create_referral_{course.id}"
-                            )
-                        ]
-                    )
-                    
-                    await callback.message.edit_text(
-                        text,
-                        reply_markup=keyboard,
-                        parse_mode="HTML"
-                    )
-        else:
-                    await callback.answer(
-                        f"❌ {level_name} uchun kurs topilmadi",
-                        show_alert=True
-                    )
-            
-    elif stage_type == "next":
-        # Keyingi bosqich - kurs sotib olishni taklif qilish
-        previous_level = f"{level_num-1}-bosqich"
-        course = await get_level_kurs(previous_level)
-        
-        if course:
-            text = f"""
-            🎯 <b>{level_name} bosqichi</b>
-
-            Bu bosqichga o'tish uchun quyidagi kursni sotib olishingiz kerak:
-
-            📚 <b>{course.name}</b>
-            💰 Narxi: {course.price:,} so'm
-            📖 Ta'rif: {course.description}
-
-            Kursni sotib olishni xohlaysizmi?
-                        """
-            if user.is_confirmed == False:
-                text += "\n\n💡 <b>Referral yaratish orqali ham kurs sotib olishingiz mumkin!</b>"
-                
-                refferal_button = InlineKeyboardButton(
-                    text="📢 Referral yaratish",
-                    callback_data=f"create_referral_{course.id}"
-                )
-                
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [refferal_button]
-                ])
-                
-                await callback.answer(
-                    "💡 Referral yaratish orqali ham kurs sotib olishingiz mumkin!", 
-                    show_alert=True
-                )
-                
-                await callback.message.answer(
-                    text,
-                    reply_markup=keyboard,
-                    parse_mode="HTML"
-                )
-            else:
-                keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="💳 Sotib olish",
-                            callback_data=f"buy_course_{course.id}"
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="◀️ Orqaga",
-                            callback_data="back_to_stages"
-                        )
-                    ]
-                ])
-                if user.is_confirmed == False:
-                    keyboard.inline_keyboard.append(
-                        [
-                            InlineKeyboardButton(
-                                text="📢 Referral yaratish",
-                                callback_data=f"create_referral_{course.id}"
-                            )
-                        ]
-                    )
-                await callback.message.edit_text(
-                    text,
-                    reply_markup=keyboard,
-                    parse_mode="HTML"
-                )
-        else:
-            await callback.answer(
-                f"❌ {level_name} uchun kurs topilmadi",
-                show_alert=True
-            )
-    
-    elif stage_type == "locked":
-        # Yopiq bosqich - ogohlantirish
-        await callback.answer(
-            f"🔒 {level_name} bosqichi hali yopiq!\n\n"
-            f"Avval oldingi bosqichlarni tugating.",
-            show_alert=True
+        await message.answer(
+            "❌ Foydalanuvchi topilmadi. Iltimos /start buyrug'ini bosing."
         )
-
-@router.callback_query(F.data == "back_to_stages")
-async def back_to_stages(callback: types.CallbackQuery, state: FSMContext):
-    """
-    Bosqichlar menyusiga qaytish
-    """
-    user_id = str(callback.from_user.id)
-    
-    # Foydalanuvchini olish
-    user = await get_user(user_id)
-    if not user:
-        await callback.answer("❌ Foydalanuvchi topilmadi")
         return
-    
+
     # Foydalanuvchi levelini olish
     user_level = await get_user_level(user_id)
     if not user_level:
         user_level = "0-bosqich"
-    
+
     # Foydalanuvchi sotib olgan kurslar levellarini olish
     purchased_course_levels = await get_user_purchased_courses_with_levels(user_id)
-    
+
     # Bosqichlar haqida matn
     text = f"""
 🎯 <b>Bosqichlar</b>
@@ -319,23 +105,153 @@ Sizning hozirgi darajangiz: <b>{user_level}</b>
 
 <b>Bosqichlar haqida:</b>
 ✅ - Tugallangan bosqich (kurs sotib olingan)
-🔓 - Ochiq bosqich (kurs sotib olinmagan)
-🔐 - Keyingi bosqich (sotib olish mumkin)
+🔓 - Ochiq bosqich (sotib olish mumkin)
 🔒 - Yopiq bosqich (avval oldingi bosqichni tugating)
 
 <b>Qoidalar:</b>
 • Har bir bosqichni ketma-ket o'tishingiz kerak
-• Keyingi bosqichga o'tish uchun oldingi bosqichdagi kursni sotib olishingiz kerak
+• Keyingi bosqichga o'tish uchun kursni sotib olishingiz kerak
 • Bosqichlarni saklab o'ta olmaysiz
+
+<b>Sotib olingan kurslar:</b> {', '.join([f'{x}-bosqich' for x in sorted(purchased_course_levels)]) if purchased_course_levels else 'Hozircha yo\'q'}
     """
-    
+
     keyboard = get_stages_keyboard(user_level, purchased_course_levels)
-    
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 
+@router.callback_query(F.data.startswith("stage_"))
+async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext):
+    """Bosqich tugmalarini boshqarish"""
+    user_id = str(callback.from_user.id)
+    action_data = callback.data.split("_")
 
+    if len(action_data) < 3:
+        await callback.answer("❌ Noto'g'ri ma'lumot")
+        return
+
+    stage_type = action_data[1]
+    level_num = int(action_data[2])
+    level_name = f"{level_num}-bosqich"
+
+    user = await fetch_user(user_id)
+    if not user:
+        await callback.answer("❌ Foydalanuvchi topilmadi")
+        return
+
+    if stage_type == "completed":
+        await callback.answer(f"✅ {level_name} bosqichi tugallangan!", show_alert=True)
+
+    elif stage_type == "available":
+        # Bu level uchun kurs topish
+        if user.invited_by:
+            invited_by = user.invited_by
+            if invited_by.level == user.level:
+                await callback.message.answer(
+                    f"Sizni taklif qilgan: @{invited_by.telegram_username} hali keyingi bosqichga o'tgani yo'q 24 soat ichida qayta urinib ko'ring yoki @admin ga bog'laning"
+                )
+                await callback.bot.send_message(
+                    invited_by.telegram_id,
+                    f"Siz taklif qilgan: @{user.telegram_username} keyingi bosqichga o'tish uchun to'lov qilmoqchi lekin siz to'lovlarni qabul qila olishingiz uchun keyingi bosqichga to'lov qilishingiz kerak",
+                )
+                return
+
+        course = await get_level_kurs(level_name)
+
+        if course:
+            text = f"""
+🎯 <b>{level_name} bosqichi</b>
+
+Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
+
+📚 <b>{course.name}</b>
+💰 Narxi: {course.price:,} so'm
+📖 Ta'rif: {course.description}
+
+Kursni sotib olishni xohlaysizmi?
+            """
+
+            keyboard_buttons = []
+
+            # Agar user tasdiqlanmagan bo'lsa, referral opsiyasini ham ko'rsatish
+            if not user.is_confirmed and not user.level == "level_0":
+                text += (
+                    "\n\n💡 <b>Referral yaratish orqali ham kurs olishingiz mumkin!</b>"
+                )
+                keyboard_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text="📢 Referral yaratish",
+                            callback_data=f"create_referral_{course.id}",
+                        )
+                    ]
+                )
+            else:
+
+                keyboard_buttons.extend(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                text="💳 Sotib olish",
+                                callback_data=f"buy_course_{course.id}",
+                            )
+                        ]
+                    ]
+                )
+            keyboard_buttons.append(
+                [InlineKeyboardButton(text="◀️ Orqaga", callback_data="back_to_stages")]
+            )
+
+            keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+            await callback.message.edit_text(
+                text, reply_markup=keyboard, parse_mode="HTML"
+            )
+        else:
+            await callback.answer(
+                f"❌ {level_name} uchun kurs topilmadi", show_alert=True
+            )
+
+    elif stage_type == "locked":
+        await callback.answer(
+            f"🔒 {level_name} bosqichi hali yopiq!\n\n"
+            f"Avval oldingi bosqichlarni tugating.",
+            show_alert=True,
+        )
+
+
+@router.callback_query(F.data == "back_to_stages")
+async def back_to_stages(callback: types.CallbackQuery, state: FSMContext):
+    """Bosqichlar menyusiga qaytish"""
+    user_id = str(callback.from_user.id)
+
+    user = await get_user(user_id)
+    if not user:
+        await callback.answer("❌ Foydalanuvchi topilmadi")
+        return
+
+    user_level = await get_user_level(user_id)
+    if not user_level:
+        user_level = "0-bosqich"
+
+    purchased_course_levels = await get_user_purchased_courses_with_levels(user_id)
+
+    text = f"""
+🎯 <b>Bosqichlar</b>
+
+Sizning hozirgi darajangiz: <b>{user_level}</b>
+
+<b>Bosqichlar haqida:</b>
+✅ - Tugallangan bosqich (kurs sotib olingan)
+🔓 - Ochiq bosqich (sotib olish mumkin)
+🔒 - Yopiq bosqich (avval oldingi bosqichni tugating)
+
+<b>Qoidalar:</b>
+• Har bir bosqichni ketma-ket o'tishingiz kerak
+• Keyingi bosqichga o'tish uchun kursni sotib olishingiz kerak
+• Bosqichlarni saklab o'ta olmaysiz
+
+<b>Sotib olingan kurslar:</b> {', '.join([f'{x}-bosqich' for x in sorted(purchased_course_levels)]) if purchased_course_levels else 'Hozircha yo\'q'}
+    """
+
+    keyboard = get_stages_keyboard(user_level, purchased_course_levels)
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")

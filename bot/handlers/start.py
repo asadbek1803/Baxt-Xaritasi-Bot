@@ -1,15 +1,22 @@
+import logging
+
 from aiogram import Router, types
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
-from bot.selectors import get_user, check_user_referral_code, get_user_buy_course, get_user_level
+
+from bot.selectors import (
+    get_user,
+    check_user_referral_code,
+    get_user_buy_course,
+    get_user_level,
+)
 from bot.states import UserRegistrationState
 from bot.services.registration import send_course_offer
 from bot.constants import Messages
-from bot.buttons.default.back import get_back_keyboard
 from bot.buttons.default.menu import get_menu_keyboard
-import logging
 
 router = Router()
+
 
 @router.message(CommandStart())
 async def start_command(message: types.Message, state: FSMContext):
@@ -20,10 +27,15 @@ async def start_command(message: types.Message, state: FSMContext):
     args = message.text.split()
     referral_code = args[1] if len(args) > 1 else None
     referral_user = None
-    
+
     if referral_code:
         try:
             referral_user = await check_user_referral_code(referral_code)
+            if referral_user.referral_count >= 5 and not referral_user.is_admin:
+                await message.answer(
+                    "⚠️ Ushbu referal orqali 5 ta odam qo'shilib bo'lgan iltimos yangi referal code uchun @adminga aloqaga chiqing"
+                )
+                return
             if referral_user:
                 # State-ga ikkala nom bilan ham saqlash (eski va yangi)
                 await state.update_data(
@@ -31,20 +43,21 @@ async def start_command(message: types.Message, state: FSMContext):
                     invited_by=referral_user,
                     # Eski nomlar ham (backward compatibility uchun)
                     refferal_code=referral_code,
-                    refferal_user=referral_user
+                    refferal_user=referral_user,
                 )
-                
+
                 await message.answer(
                     text=(
                         "📝 Referral tarqatuvchi ma'lumotlari topildi ✅\n\n"
                         f"👤 <b>Foydalanuvchi:</b> {referral_user.full_name}\n"
-                        f"🔗 <b>Referal kod:</b> <code>{referral_user.referral_code}</code>\n"
                         f"🎓 <b>Referal darajasi:</b> {referral_user.level}\n"
                         f"🆔 <b>Referal ID:</b> <code>{referral_user.telegram_id}</code>"
                     ),
-                    parse_mode="HTML"
+                    parse_mode="HTML",
                 )
-                logging.info(f"Valid referral code found: {referral_code} from user {referral_user.full_name}")
+                logging.info(
+                    f"Valid referral code found: {referral_code} from user {referral_user.full_name}"
+                )
             else:
                 await message.answer(
                     "⚠️ Berilgan referal kod noto'g'ri. Iltimos, to'g'ri referal kodni kiriting."
@@ -53,9 +66,7 @@ async def start_command(message: types.Message, state: FSMContext):
                 return
         except Exception as e:
             logging.error(f"Error checking referral code {referral_code}: {e}")
-            await message.answer(
-                "⚠️ Referal kodini tekshirishda xatolik yuz berdi."
-            )
+            await message.answer("⚠️ Referal kodini tekshirishda xatolik yuz berdi.")
             return
 
     if not user:
@@ -66,26 +77,30 @@ async def start_command(message: types.Message, state: FSMContext):
                 "Sizda u yo'q bo'lsa @adminusernamega murojjat qiling!"
             )
             return
-            
+
         # Referral ma'lumotlarini log qilish
         if referral_user:
-            logging.info(f"Starting registration with referrer: {referral_user.full_name} (code: {referral_code})")
-        
-        await message.answer(Messages.ask_full_name.value, reply_markup=get_back_keyboard())
+            logging.info(
+                f"Starting registration with referrer: {referral_user.full_name} (code: {referral_code})"
+            )
+
+        await message.answer(
+            Messages.ask_full_name.value
+        )
         await state.set_state(UserRegistrationState.GET_FULL_NAME)
         return
 
     user_level = await get_user_level(telegram_id=user_id)
 
     # Agar foydalanuvchi birinchi bosqichda bo'lsa
-    if user_level == "0-bosqich":
+    if user_level == "1-bosqich":
         has_course = await get_user_buy_course(user_id)
 
         if has_course:
             # Agar kurs sotib olingan bo'lsa → menyu
             await message.answer(
                 text=Messages.welcome_message.value.format(full_name=user.full_name),
-                reply_markup=get_menu_keyboard()
+                reply_markup=get_menu_keyboard(),
             )
         else:
             # Agar kurs sotib olinmagan bo'lsa → kurs taklif qilinadi
@@ -95,5 +110,5 @@ async def start_command(message: types.Message, state: FSMContext):
     # Agar foydalanuvchi yuqori bosqichda bo'lsa → menyu
     await message.answer(
         text=Messages.welcome_message.value.format(full_name=user.full_name),
-        reply_markup=get_menu_keyboard()
+        reply_markup=get_menu_keyboard(),
     )

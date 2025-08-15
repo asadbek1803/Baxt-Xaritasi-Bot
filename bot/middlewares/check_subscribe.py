@@ -1,7 +1,12 @@
 import logging
 from typing import Callable, Dict, Any, Awaitable, Union
 from aiogram import Bot
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 from aiogram.fsm.context import FSMContext
@@ -21,7 +26,7 @@ class ChannelMembershipMiddleware(BaseMiddleware):
         self,
         handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
         event: Union[Message, CallbackQuery],
-        data: Dict[str, Any]
+        data: Dict[str, Any],
     ) -> Any:
 
         user_id = event.from_user.id
@@ -31,7 +36,7 @@ class ChannelMembershipMiddleware(BaseMiddleware):
         if isinstance(event, CallbackQuery) and event.data == "check_subscription":
             return await handler(event, data)
 
-        state: FSMContext = data.get('state')
+        state: FSMContext = data.get("state")
         if state:
             current_state = await state.get_state()
             if current_state in [
@@ -39,7 +44,7 @@ class ChannelMembershipMiddleware(BaseMiddleware):
                 UserRegistrationState.GET_PHONE_NUMBER,
                 UserRegistrationState.GET_REGION,
                 UserRegistrationState.GET_PROFESSION,
-                UserRegistrationState.GET_GENDER
+                UserRegistrationState.GET_GENDER,
             ]:
                 return await handler(event, data)
 
@@ -60,34 +65,34 @@ class ChannelMembershipMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         not_subscribed_channels = []
-        
+
         for channel in channels:
             is_telegram = getattr(channel, "is_telegram", True)
-            is_private = getattr(channel, "is_private", False)
 
             if is_telegram and getattr(channel, "telegram_id", None):
                 try:
                     member = await self.bot.get_chat_member(
-                        chat_id=channel.telegram_id,
-                        user_id=user_id
+                        chat_id=channel.telegram_id, user_id=user_id
                     )
-                    
+
                     # ⭐ Asosiy o'zgarish: restricted statusini ham a'zo deb hisoblaymiz
-                    if member.status in ['left', 'kicked']:
+                    if member.status in ["left", "kicked"]:
                         not_subscribed_channels.append(channel)
-                        
+
                 except TelegramBadRequest as e:
                     logging.error(f"Kanal {channel.name} tekshirishda xatolik: {e}")
                     not_subscribed_channels.append(channel)
                 except TelegramForbiddenError:
-                    logging.error(f"Bot kanaldan chiqarib yuborilgan yoki unga kira olmaydi: {channel.name}")
+                    logging.error(
+                        f"Bot kanaldan chiqarib yuborilgan yoki unga kira olmaydi: {channel.name}"
+                    )
                     not_subscribed_channels.append(channel)
                 except Exception as e:
                     logging.error(f"Kutilmagan xatolik: {e}")
                     not_subscribed_channels.append(channel)
             else:
                 not_subscribed_channels.append(channel)
-        
+
         # Faqatgina a'zo bo'lmagan (left, kicked) kanallar bo'lsa, bloklaymiz
         if not not_subscribed_channels:
             return await handler(event, data)
@@ -97,10 +102,13 @@ class ChannelMembershipMiddleware(BaseMiddleware):
 
     async def send_subscription_message(self, message: Message, channels: list):
         try:
-            base_message = getattr(Messages.do_member_in_channel, 'value', 
-                                    "📢 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:")
-            
-            text = html.escape(base_message) + "\n\n"
+            base_message = getattr(
+                Messages.do_member_in_channel,
+                "value",
+                "📢 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:",
+            )
+
+            text = base_message + "\n\n"
             keyboard = InlineKeyboardMarkup(inline_keyboard=[])
 
             if channels:
@@ -110,32 +118,34 @@ class ChannelMembershipMiddleware(BaseMiddleware):
                     is_private = getattr(channel, "is_private", False)
 
                     if link:
-                        button_text = f"🔒 {username}" if is_private else f"📢 {username}"
-                        keyboard.inline_keyboard.append([
-                            InlineKeyboardButton(
-                                text=button_text,
-                                url=str(link)
-                            )
-                        ])
+                        button_text = (
+                            f"🔒 {username}" if is_private else f"📢 {username}"
+                        )
+                        keyboard.inline_keyboard.append(
+                            [InlineKeyboardButton(text=button_text, url=str(link))]
+                        )
                         text += f"📢 <b>{username}</b>\n"
                     else:
                         text += f"📢 <b>{username}</b>\n"
 
-            keyboard.inline_keyboard.append([
-                InlineKeyboardButton(
-                    text="✅ A'zolikni tekshirish",
-                    callback_data="check_subscription"
-                )
-            ])
+            keyboard.inline_keyboard.append(
+                [
+                    InlineKeyboardButton(
+                        text="✅ A'zolikni tekshirish",
+                        callback_data="check_subscription",
+                    )
+                ]
+            )
 
             text += "\n💡 <b>A'zo bo'lgandan so'ng 'A'zolikni tekshirish' tugmasini bosing!</b>"
 
             await message.answer(
                 text,
                 parse_mode="HTML",
-                disable_web_page_preview=True,
-                reply_markup=keyboard
+                reply_markup=keyboard,
             )
         except Exception as e:
             logging.error(f"Xabar yuborishda xatolik: {e}")
-            await message.answer("📢 Botdan foydalanish uchun majburiy kanallarga a'zo bo'ling!")
+            await message.answer(
+                "📢 Botdan foydalanish uchun majburiy kanallarga a'zo bo'ling!"
+            )

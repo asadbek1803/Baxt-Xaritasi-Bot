@@ -35,7 +35,7 @@ PROFESSIONS = [
     ("psy", "Psixolog"),
     ("home", "Uy bekasi"),
     ("student", "Talaba"),
-    ("other", "Boshqa")
+    ("other", "Boshqa"),
 ]
 
 
@@ -46,37 +46,38 @@ GENDER = [
 ]
 
 AGE_CHOICES = [
-        ('18-24', '18-24'),
-        ('25-34', '25-34'),
-        ('35-44', '35-44'),
-        ('45+', '45+'),
-    ]
+    ("18-24", "18-24"),
+    ("25-34", "25-34"),
+    ("35-44", "35-44"),
+    ("45+", "45+"),
+]
 
 LEVEL_CHOICES = [
-    ('level_0', "0-bosqich"),
-    ('level_1', "1-bosqich"),
-    ('level_2', "2-bosqich"),
-    ('level_3', "3-bosqich"),
-    ('level_4', "4-bosqich"),
-    ('level_5', "5-bosqich"),
-    ('level_6', "6-bosqich"),
-    ('level_7', "7-bosqich"),
+    ("level_0", "0-bosqich"),
+    ("level_1", "1-bosqich"),
+    ("level_2", "2-bosqich"),
+    ("level_3", "3-bosqich"),
+    ("level_4", "4-bosqich"),
+    ("level_5", "5-bosqich"),
+    ("level_6", "6-bosqich"),
+    ("level_7", "7-bosqich"),
 ]
 
 # Statuslar Choices
 STATUS_CHOICES = [
-        ('PENDING', 'Kutilmoqda'),
-        ('CONFIRMED', 'Tasdiqlangan'),
-        ('REJECTED', 'Rad etilgan')
-    ]
+    ("PENDING", "Kutilmoqda"),
+    ("CONFIRMED", "Tasdiqlangan"),
+    ("REJECTED", "Rad etilgan"),
+]
 
 PAYMENT_TYPES = [
-        ('KONKURS', 'Konkurs to\'lovi'),
-        ('COURSE', 'Kurs to\'lovi'),
-        ('DONATION', 'Xayriya to\'lovi')
-    ]
+    ("KONKURS", "Konkurs to'lovi"),
+    ("COURSE", "Kurs to'lovi"),
+    ("DONATION", "Xayriya to'lovi"),
+]
 
 # Button Enum
+
 
 class Button(Enum):
     send_phone_number = "📲 Telefon raqamini yuborish"
@@ -89,6 +90,7 @@ class Button(Enum):
     back = "🔙 Orqaga"
     check_member_to_channel = "✅ A'zo bo'ldim"
 
+
 class Messages(Enum):
     # User Registration card messages
     ask_full_name = "📝 Familya, Ism, Sharifingizni to'liq kiriting:"
@@ -97,15 +99,19 @@ class Messages(Enum):
     ask_profession = "💼 Kasbingizni tanlang: "
     ask_gender = "👤 Jinsingizni tanlang:"
 
-    welcome_message_for_registration = """Assalomu alaykum. \n\nSiz ro'yxatdan muvaffaqiyatli o'tdingiz!\nSahifamizga xush kelibsiz!🥰\n\nUshbu bot orqali siz psixolog <b>Gulhayo Mo'minova</b>ning kurslari orqali ham ruhan rivojlanasiz ham oylik daromadga ega bo'lasiz. \n\n\nTo'liq botdan foydalanish uchun avvalo <b>1-bosqich</b> SHUKRONALIK MO'JIZALARI kursimizga 40ming so'm to'lov qiling."""
+    welcome_message_for_registration = """Assalomu alaykum. \n\nSiz ro'yxatdan muvaffaqiyatli o'tdingiz!\nSahifamizga xush kelibsiz!🥰\n\nUshbu bot orqali siz psixolog <b>Gulhayo Mo'minova</b>ning kurslari orqali ham ruhan rivojlanasiz ham oylik daromadga ega bo'lasiz. \n\n\nTo'liq botdan foydalanish uchun avvalo <b>1-bosqich</b> SHUKRONALIK MO'JIZALARI kursimizga {} so'm to'lov qiling."""
 
     welcome_message = """Assalomu alaykum, {full_name}!\n\nSiz botimizga xush kelibsiz! Bu yerda siz o'z kasbingiz bo'yicha rivojlanishingiz va yangi imkoniyatlar topishingiz mumkin.\n\nIltimos, quyidagi tugmalar orqali davom eting:"""
 
     # Check member to channel
     do_member_in_channel = """🚀 Loyihada ishtirok etish uchun quyidagi kanallarga a'zo bo'ling. Keyin <b>"✅ A'zo bo'ldim"</b> tugmasini bosing\n\n⚠️ <i>Yopiq kanallarga ulanish so'rovini yuborishingiz kifoya.</i>"""
     # Registration error messages
-    registration_error = "❌ Ro'yxatdan o'tishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."
-    full_name_error = "❌ To'liq ism 3-100 ta belgi orasida bo'lishi kerak. Qaytadan kiriting:"
+    registration_error = (
+        "❌ Ro'yxatdan o'tishda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."
+    )
+    full_name_error = (
+        "❌ To'liq ism 3-100 ta belgi orasida bo'lishi kerak. Qaytadan kiriting:"
+    )
     profession_error = "❌ Noto'g'ri kasb tanlandi. Iltimos, qaytadan tanlang."
     phone_number_error = """❌ Telefon raqam noto'g'ri formatda!\n"
             "Iltimos, tugmani bosing yoki +998901234567 formatida kiriting:"""
@@ -116,7 +122,7 @@ class Messages(Enum):
     gender_error = "❌ Iltimos, jinsingizni tanlang: Erkak yoki Ayol."
     too_requests = "❗️ Siz juda ko'p so'rov yubordingiz. Iltimos, bir necha daqiqa kuting va qaytadan urinib ko'ring."
     # To'lov rekvizitlari
-    
+
     payment_details = (
         "💳 <b>To'lov uchun rekvizitlar:</b>\n"
         "🏦 Karta raqami: <code>{card_number}</code>\n"
@@ -124,4 +130,3 @@ class Messages(Enum):
         "💰 To'lov summasi: <b>{amount} so'm</b>\n\n"
         "📸 To'lovni amalga oshirib, chek (screenshot) yuboring."
     )
-
