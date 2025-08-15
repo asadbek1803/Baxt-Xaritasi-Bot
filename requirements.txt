@@ -14,4 +14,4 @@ django-redis  # agar Redis cache ishlatilsa
 celery
 gevent
 python-dotenv
-psycopg2
+psycopg2-binary
