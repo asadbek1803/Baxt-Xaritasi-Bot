@@ -228,7 +228,6 @@ async def process_referral_payment_screenshot(
 
         await message.answer(
             "To'lov tasdiqangadan so'ng sizga xabar beriladi ! ",
-            reply_markup=get_back_keyboard(),
         )
         await state.clear()
 
