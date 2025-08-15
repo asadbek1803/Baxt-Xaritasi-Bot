@@ -16,6 +16,7 @@ def get_stages_keyboard(
         current_level_num = 0
 
     # 7 ta bosqich uchun tugmalar yaratish
+    current_level_num += 1
     for level_num in range(1, 8):  # 1 dan 7 gacha
         level_name = f"{level_num}-bosqich"
 
