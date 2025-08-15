@@ -39,7 +39,7 @@ class TelegramUser(models.Model):
         help_text="Foydalanuvchi darajasi",
         choices=LEVEL_CHOICES,
         verbose_name="Foydalanuvchi darajasi",
-        default=LEVEL_CHOICES[0],  # Default qiymat qo'shildi
+        default="level_0",  # Default qiymat qo'shildi
     )
 
     phone_number = models.CharField(

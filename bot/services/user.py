@@ -17,6 +17,7 @@ async def create_user(
     referral_code: str = None,  # refferal_code o'rniga referral_code
     invited_by: TelegramUser = None,  # refferal_user o'rniga invited_by
     region: str = None,
+    level: str = None,
     gender: str = None
 ) -> TelegramUser:
     """
@@ -39,6 +40,7 @@ async def create_user(
                 profession=profession,
                 invited_by=invited_by,
                 region=region,
+                level=level,
                 gender=gender
             )
             if updated:
@@ -56,6 +58,7 @@ async def create_user(
             profession=profession,
             invited_by=invited_by,
             region=region,
+            level=level,
             gender=gender
         )
 
@@ -111,6 +114,7 @@ async def update_user(
     telegram_username: str = None,
     profession: str = None,
     region: str = None,
+    level: str = None,
     gender: str = None,
     is_confirmed: bool = None,
     invited_by: TelegramUser = None,  # Yangi maydon qo'shildi
@@ -147,6 +151,7 @@ async def update_user(
             "profession": profession,
             "is_confirmed": is_confirmed,
             "gender": gender,
+            "level": level,
             "invited_by": invited_by,
             "referral_code": referral_code,
             "card_number": card_number,
