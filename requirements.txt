@@ -13,3 +13,4 @@ redis  # agar Redis ishlatilsa
 django-redis  # agar Redis cache ishlatilsa
 celery
 gevent
+python-dotenv

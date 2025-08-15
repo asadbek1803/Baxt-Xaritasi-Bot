@@ -31,6 +31,11 @@ async def start_command(message: types.Message, state: FSMContext):
     if referral_code:
         try:
             referral_user = await check_user_referral_code(referral_code)
+            if referral_user.referral_count >= 5 and not referral_user.is_admin:
+                await message.answer(
+                    "⚠️ Ushbu referal orqali 5 ta odam qo'shilib bo'lgan iltimos yangi referal code uchun @adminga aloqaga chiqing"
+                )
+                return
             if referral_user:
                 # State-ga ikkala nom bilan ham saqlash (eski va yangi)
                 await state.update_data(
@@ -45,7 +50,6 @@ async def start_command(message: types.Message, state: FSMContext):
                     text=(
                         "📝 Referral tarqatuvchi ma'lumotlari topildi ✅\n\n"
                         f"👤 <b>Foydalanuvchi:</b> {referral_user.full_name}\n"
-                        f"🔗 <b>Referal kod:</b> <code>{referral_user.referral_code}</code>\n"
                         f"🎓 <b>Referal darajasi:</b> {referral_user.level}\n"
                         f"🆔 <b>Referal ID:</b> <code>{referral_user.telegram_id}</code>"
                     ),

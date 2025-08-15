@@ -108,7 +108,7 @@ class ChannelMembershipMiddleware(BaseMiddleware):
                 "📢 Botdan foydalanish uchun quyidagi kanallarga a'zo bo'ling:",
             )
 
-            text = html.escape(base_message) + "\n\n"
+            text = base_message + "\n\n"
             keyboard = InlineKeyboardMarkup(inline_keyboard=[])
 
             if channels:
@@ -142,7 +142,6 @@ class ChannelMembershipMiddleware(BaseMiddleware):
             await message.answer(
                 text,
                 parse_mode="HTML",
-                disable_web_page_preview=True,
                 reply_markup=keyboard,
             )
         except Exception as e:

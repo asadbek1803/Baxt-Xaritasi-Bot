@@ -37,7 +37,7 @@ REVERSE_LEVEL_MAPPING = {v: k for k, v in LEVEL_MAPPING.items()}
 
 @sync_to_async
 def fetch_user(chat_id: str):
-    return TelegramUser.objects.filter(telegram_id=chat_id).first()
+    return TelegramUser.objects.select_related("invited_by").filter(telegram_id=chat_id).first()
 
 
 
@@ -69,9 +69,9 @@ def get_all_admins():
 
 
 @sync_to_async
-def get_all_channels():
+def get_all_channels(is_telegram: bool = True):
     """Barcha majburiy kanallarni olish"""
-    return list(MandatoryChannel.objects.filter(is_active=True))
+    return list(MandatoryChannel.objects.filter(is_active=True, is_telegram=is_telegram))
 
 
 @sync_to_async

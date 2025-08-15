@@ -227,7 +227,7 @@ async def process_referral_payment_screenshot(
             print(f"[process_screenshot] Error sending to admin: {e}")
 
         await message.answer(
-            "✅ To'lov cheki qabul qilindi! Admin tasdiqlaganidan so'ng sizga xabar beriladi.",
+            "To'lov tasdiqangadan so'ng sizga xabar beriladi ! ",
             reply_markup=get_back_keyboard(),
         )
         await state.clear()
@@ -290,7 +290,7 @@ async def confirm_referral_payment(callback: types.CallbackQuery):
         except Exception as e:
             print(f"[confirm_referral] Error saving payment: {e}")
             return await callback.answer(
-                "❌ To'lovni saqlashda xatolik!", show_alert=True
+                f"❌ To'lovni saqlashda xatolik!: {str(e)}", show_alert=True
             )
 
         # Update user status and generate referral code if needed
@@ -306,33 +306,16 @@ async def confirm_referral_payment(callback: types.CallbackQuery):
 
         # Send confirmation to user
         try:
-            from core.settings import TELEGRAM_BOT_USERNAME
-
-            referral_link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={payment_user.referral_code}"
-
             await callback.bot.send_message(
                 chat_id=payment_user.telegram_id,
                 text="🎉 Tabriklaymiz! Sizning referral to'lovingiz tasdiqlandi.\n\n"
                 "Endi siz ham o'z referral kodingiz orqali odam taklif qilishingiz mumkin!",
             )
-            await callback.bot.send_message(
-                chat_id=payment_user.telegram_id,
-                text=f"🎯 Sizning Referral Ma'lumotlaringiz:\n\n"
-                f"🆔 Referral ID: {payment_user.telegram_id}\n"
-                f"🔑 Referral kod: {payment_user.referral_code}\n"
-                f"👥 To'liq ismingiz: {payment_user.full_name}\n"
-                f"💰 To'langan summa: {payment.amount:,} so'm\n"
-                f"📅 To'lov vaqti: {payment.created_at.strftime('%d-%m-%Y %H:%M')}\n"
-                f"✅ Status: Tasdiqlandi\n\n"
-                f"🔗 Sizning referral havolangiz:\n"
-                f"{referral_link}",
-                parse_mode="HTML",
-            )
         except Exception as e:
             print(f"[confirm_referral] Error sending confirmation: {e}")
 
         await callback.answer("✅ Referral to'lovi tasdiqlandi!", show_alert=True)
-
+        await callback.message.delete()
     except Exception as e:
         print(f"[confirm_referral] Unexpected error: {e}")
         await callback.answer("❌ Kutilmagan xatolik yuz berdi!", show_alert=True)
@@ -386,7 +369,7 @@ async def reject_referral_payment(callback: types.CallbackQuery):
             print(f"[reject_referral] Error sending rejection: {e}")
 
         await callback.answer("❌ Referral to'lovi rad etildi!", show_alert=True)
-
+        await callback.message.delete()
     except Exception as e:
         print(f"[reject_referral] Unexpected error: {e}")
         await callback.answer("❌ Kutilmagan xatolik yuz berdi!", show_alert=True)

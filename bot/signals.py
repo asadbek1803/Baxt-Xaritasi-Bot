@@ -1,5 +1,6 @@
 import requests
 
+from asgiref.sync import async_to_sync
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from aiogram.types import (
@@ -9,6 +10,7 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 
+from bot.selectors import create_referral_payment_request
 from core.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME
 from .models import Payments, ReferralPayment
 
@@ -82,19 +84,29 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
             response = requests.post(BASE_URL, json=payload)
             response.raise_for_status()
 
-            message = f"""
-Keyingi qadam endi siz sizni bu loyihaga qo'shilishingizga sababchi bo'lgan liderga daromadini tashlab berishingiz kerak.
-Belgilangan summa 200 000 so’m.
-To'lov qilishingiz uchun hamkorning telegram lichkasiga yozib yoki ushbu telefon raqamga telefon qilib karta raqam oling va to'lov qiling.
-Va shundan so'ng, siz ham o'z shaxsiy referalingizga ega bo'lasiz va yaqinlaringizni taklif qila olasiz.
-hamkor ismi : {instance.user.invited_by.full_name}, \nKarta raqami: {instance.user.invited_by.card_number}
-"""
+            payment_messsage = (
+                "➡️ Keyingi qadam endi siz sizni bu loyihaga qo'shilishingizga sababchi bo'lgan liderga daromadini tashlab berishingiz kerak\n\n"
+                "💡 Referral tizimi haqida:\n\n"
+                "1️⃣ Siz avval 200,000 so'm to'lovni amalga oshirishingiz kerak\n"
+                "2️⃣ To'lov tasdiqlangach, sizga maxsus referral kod beriladi\n"
+                "3️⃣ Bu kod orqali boshqalarni taklif qilganingizda:\n"
+                "   - Ular ham 200,000 so'm to'lashadi\n"
+                "   - To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal 200 ming so'mdan sizga to'lov qilishadi.\n\n"
+                "💳 To'lov uchun karta ma'lumotlari:\n"
+                f"Telefon raqami: {instance.user.invited_by.phone_number}\n"
+                f"Telegram profili: @{instance.user.invited_by.telegram_username}\n"
+                "To'lov qilganingizdan so'ng pastdagi tugmani bosing:"
+            )
+            referral_payment = async_to_sync(create_referral_payment_request)(
+                user_id=chat_id, 
+                amount=200_000
+            )
             reply_markup = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="📢 Referral yaratish",
-                            callback_data=f"create_referral_{instance.course.id}"
+                            text="✅ To'lov qildim",
+                            callback_data=f"payment_made_{referral_payment.id}",
                         )
                     ]
                 ]
@@ -102,7 +114,7 @@ hamkor ismi : {instance.user.invited_by.full_name}, \nKarta raqami: {instance.us
 
             payload = {
                 "chat_id": chat_id,
-                "text": message,
+                "text": payment_messsage,
                 "reply_markup": reply_markup,
                 "parse_mode": "HTML",
             }
