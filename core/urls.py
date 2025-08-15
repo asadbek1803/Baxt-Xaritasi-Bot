@@ -11,9 +11,9 @@ from django.conf.urls.static import static
 admin.site.index = custom_admin_index
 
 urlpatterns = [
+    path("webhook/", telegram_webhook),
     path('admin/', admin.site.urls),
     path("", admin.site.urls),
-    path("webhook/", telegram_webhook),
 ]
 # Serve media files in development
 if settings.DEBUG:
