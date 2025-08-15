@@ -6,6 +6,7 @@ services:
     ports:
       - "6379:6379"
     restart: always
+  
 
   web:
     build: .
@@ -16,7 +17,19 @@ services:
       - "8000:8000"
     depends_on:
       - redis
-
+      - db
+    
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    
   celery:
     build: .
     command: celery -A core worker -l info
