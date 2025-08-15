@@ -1,12 +1,16 @@
 import os
+import logging
+
 from dotenv import load_dotenv
+from django.db import close_old_connections
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from aiogram import Bot, Dispatcher
 from aiogram.types import Update
-import logging
 from asgiref.sync import sync_to_async
-from django.db import close_old_connections
+
+from bot.handlers import router
+from bot.middlewares.check_subscribe import ChannelMembershipMiddleware
 
 # Initialize logging
 logger = logging.getLogger(__name__)
@@ -18,18 +22,11 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
 
-## Middlewares
-from bot.middlewares.throttling import ThrottlingMiddleware
-from bot.middlewares.check_subscribe import ChannelMembershipMiddleware
-
-
 dp.callback_query.middleware(ChannelMembershipMiddleware(bot=bot, skip_admins=True))
 dp.message.middleware(ChannelMembershipMiddleware(bot=bot, skip_admins=True))
 
-
-# Include your router
-from bot.handlers import router
 dp.include_router(router)
+
 
 @csrf_exempt
 async def telegram_webhook(request):
@@ -39,25 +36,26 @@ async def telegram_webhook(request):
     try:
         # Validate the incoming update
         update = Update.model_validate_json(request.body)
-        
+
         # Process update with proper error handling
         await process_update(update)
-        
+
         return JsonResponse({"ok": True})
-    
+
     except Exception as e:
         logger.error(f"Error processing update: {e}", exc_info=True)
         return HttpResponseBadRequest(f"Error processing update: {e}")
+
 
 async def process_update(update: Update):
     """Process update with proper resource management"""
     try:
         # Clean Django DB connections before processing
         await sync_to_async(close_old_connections)()
-        
+
         # Process the update through the dispatcher
         await dp.feed_update(bot, update=update)
-        
+
     except Exception as e:
         logger.error(f"Failed to process update {update.update_id}: {e}", exc_info=True)
         raise
