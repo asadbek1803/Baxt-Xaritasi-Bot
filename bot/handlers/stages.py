@@ -147,8 +147,15 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
         if user.invited_by:
             invited_by = user.invited_by
             if invited_by.level == user.level:
-                await callback.message.answer(f"Sizni taklif qilgan: @{invited_by.telegram_username} hali keyingi bosqichga o'tgani yo'q 24 soat ichida qayta urinib ko'ring yoki @admin ga bog'laning")
-                await callback.bot.send_message(invited_by.telegram_id, f"Siz taklif qilgan: @{user.telegram_username} keyingi bosqichga o'tish uchun to'lov qilmoqchi lekin siz to'lovlarni qabul qila olishingiz uchun keyingi bosqichga to'lov qilishingiz kerak")
+                await callback.message.answer(
+                    f"Sizni taklif qilgan: @{invited_by.telegram_username} hali keyingi bosqichga o'tgani yo'q 24 soat ichida qayta urinib ko'ring yoki @admin ga bog'laning"
+                )
+                await callback.bot.send_message(
+                    invited_by.telegram_id,
+                    f"Siz taklif qilgan: @{user.telegram_username} keyingi bosqichga o'tish uchun to'lov qilmoqchi lekin siz to'lovlarni qabul qila olishingiz uchun keyingi bosqichga to'lov qilishingiz kerak",
+                )
+                return
+
         course = await get_level_kurs(level_name)
 
         if course:
