@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.selectors import (
+    fetch_user,
     get_user,
     get_user_level,
     get_level_kurs,
@@ -13,42 +14,45 @@ from bot.selectors import (
 
 router = Router()
 
-def get_stages_keyboard(user_level: str, purchased_course_levels: set) -> InlineKeyboardMarkup:
+
+def get_stages_keyboard(
+    user_level: str, purchased_course_levels: set
+) -> InlineKeyboardMarkup:
     keyboard_buttons = []
-    
+
     # Foydalanuvchi bosqich raqamini to'g'ri olish
     try:
-        if user_level.startswith('level_'):
-            current_level = int(user_level.split('_')[1])
+        if user_level.startswith("level_"):
+            current_level = int(user_level.split("_")[1])
         elif "-bosqich" in user_level:
             current_level = int(user_level.split("-")[0])
         else:
             current_level = 0
     except:
         current_level = 0
-        
+
     print(f"User current level: {current_level}")
     print(f"Purchased course levels: {purchased_course_levels}")
-    
+
     # Eng yuqori sotib olingan levelni topish
     max_purchased_level = max(purchased_course_levels) if purchased_course_levels else 0
-    
+
     print(f"Max purchased level: {max_purchased_level}")
-    
+
     # 1 dan 7 gacha bosqichlar uchun tugmalar
     for level_num in range(1, 8):
         level_name = f"{level_num}-bosqich"
-        
+
         # Kursni sotib olganmi?
         is_purchased = level_num in purchased_course_levels
-        
+
         # Bu levelga kirish huquqi bormi?
         # Mantiq: sotib olingan levellar + keyingi bitta level ochiq
         can_access = level_num == max_purchased_level + 1
         print(can_access)
         print(f"Level {level_num}: purchased={is_purchased}, can_access={can_access}")
-        
-        if can_access == True:
+
+        if can_access:
             # Sotib olinmagan lekin ochiq
             button_text = f"🔓 {level_name}"
             callback_data = f"stage_available_{level_num}"
@@ -61,11 +65,16 @@ def get_stages_keyboard(user_level: str, purchased_course_levels: set) -> Inline
             button_text = f"🔒 {level_name}"
             callback_data = f"stage_locked_{level_num}"
 
-        keyboard_buttons.append([InlineKeyboardButton(text=button_text, callback_data=callback_data)])
+        keyboard_buttons.append(
+            [InlineKeyboardButton(text=button_text, callback_data=callback_data)]
+        )
 
-    keyboard_buttons.append([InlineKeyboardButton(text="🔙 Orqaga", callback_data="back_to_home")])
-    
+    keyboard_buttons.append(
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data="back_to_home")]
+    )
+
     return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+
 
 @router.message(F.text == "⚡️ Bosqichlar")
 async def show_stages(message: types.Message, state: FSMContext):
@@ -116,7 +125,7 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
     """Bosqich tugmalarini boshqarish"""
     user_id = str(callback.from_user.id)
     action_data = callback.data.split("_")
-    
+
     if len(action_data) < 3:
         await callback.answer("❌ Noto'g'ri ma'lumot")
         return
@@ -124,8 +133,8 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
     stage_type = action_data[1]
     level_num = int(action_data[2])
     level_name = f"{level_num}-bosqich"
-    
-    user = await get_user(user_id)
+
+    user = await fetch_user(user_id)
     if not user:
         await callback.answer("❌ Foydalanuvchi topilmadi")
         return
@@ -135,6 +144,11 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
 
     elif stage_type == "available":
         # Bu level uchun kurs topish
+        if user.invited_by:
+            invited_by = user.invited_by
+            if invited_by.level == user.level:
+                await callback.message.answer(f"Sizni taklif qilgan: @{invited_by.telegram_username} hali keyingi bosqichga o'tgani yo'q 24 soat ichida qayta urinib ko'ring yoki @admin ga bog'laning")
+                await callback.bot.send_message(invited_by.telegram_id, f"Siz taklif qilgan: @{user.telegram_username} keyingi bosqichga o'tish uchun to'lov qilmoqchi lekin siz to'lovlarni qabul qila olishingiz uchun keyingi bosqichga to'lov qilishingiz kerak")
         course = await get_level_kurs(level_name)
 
         if course:
@@ -151,45 +165,50 @@ Kursni sotib olishni xohlaysizmi?
             """
 
             keyboard_buttons = []
-            
+
             # Agar user tasdiqlanmagan bo'lsa, referral opsiyasini ham ko'rsatish
-            if not user.is_confirmed:
-                text += "\n\n💡 <b>Referral yaratish orqali ham kurs olishingiz mumkin!</b>"
-                keyboard_buttons.append([
-                    InlineKeyboardButton(
-                        text="📢 Referral yaratish",
-                        callback_data=f"create_referral_{course.id}"
-                    )
-                ])
-            else:
-
-
-                keyboard_buttons.extend([
+            if not user.is_confirmed and not user.level == "level_0":
+                text += (
+                    "\n\n💡 <b>Referral yaratish orqali ham kurs olishingiz mumkin!</b>"
+                )
+                keyboard_buttons.append(
                     [
                         InlineKeyboardButton(
-                            text="💳 Sotib olish",
-                            callback_data=f"buy_course_{course.id}"
+                            text="📢 Referral yaratish",
+                            callback_data=f"create_referral_{course.id}",
                         )
-                    ]])
+                    ]
+                )
+            else:
+
+                keyboard_buttons.extend(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                text="💳 Sotib olish",
+                                callback_data=f"buy_course_{course.id}",
+                            )
+                        ]
+                    ]
+                )
             keyboard_buttons.append(
-                [
-                    InlineKeyboardButton(
-                        text="◀️ Orqaga", 
-                        callback_data="back_to_stages"
-                    )
-                ]
+                [InlineKeyboardButton(text="◀️ Orqaga", callback_data="back_to_stages")]
             )
 
             keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-            await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+            await callback.message.edit_text(
+                text, reply_markup=keyboard, parse_mode="HTML"
+            )
         else:
-            await callback.answer(f"❌ {level_name} uchun kurs topilmadi", show_alert=True)
+            await callback.answer(
+                f"❌ {level_name} uchun kurs topilmadi", show_alert=True
+            )
 
     elif stage_type == "locked":
         await callback.answer(
             f"🔒 {level_name} bosqichi hali yopiq!\n\n"
             f"Avval oldingi bosqichlarni tugating.",
-            show_alert=True
+            show_alert=True,
         )
 
 
@@ -197,7 +216,6 @@ Kursni sotib olishni xohlaysizmi?
 async def back_to_stages(callback: types.CallbackQuery, state: FSMContext):
     """Bosqichlar menyusiga qaytish"""
     user_id = str(callback.from_user.id)
-    
 
     user = await get_user(user_id)
     if not user:

@@ -52,6 +52,7 @@ async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
         return await callback.message.answer(
             text=Messages.welcome_message.value.format(full_name=hbold(user.full_name)),
             reply_markup=get_menu_keyboard(),
+            parse_mode="HTML"
         )
 
     course = await get_level_kurs(level=user_level)
@@ -85,17 +86,8 @@ async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
 async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
     user_id = callback.from_user.id
 
-    # Show checking status
-    await callback.message.answer("🔍 A'zolik holati tekshirilmoqda...")
-
     try:
         channels = await get_all_channels()
-        if not channels:
-            return await callback.message.answer(
-                "ℹ️ Hozircha a'zo bo'lish uchun kanallar mavjud emas.",
-                reply_markup=get_menu_keyboard(),
-            )
-
         not_subscribed = await check_user_subscriptions(bot, user_id, channels)
 
         if not_subscribed:
