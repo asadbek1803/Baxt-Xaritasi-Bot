@@ -243,14 +243,14 @@ async def copy_link_only(callback: types.CallbackQuery):
         await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)
 
 
-@router.callback_query(F.data == "back_to_profile")
+@router.callback_query(F.data.startswith("stats"))
 async def back_to_profile_handler(callback: types.CallbackQuery):
     """Profilga qaytish"""
     try:
         # Profilni qayta ko'rsatish uchun my_profile_handler logikasini chaqiramiz
         user_id = str(callback.from_user.id)
         user_data = await get_user_profile_by_telegram_id(user_id)
-        
+
         if not user_data:
             await callback.answer("❌ Profil topilmadi!", show_alert=True)
             return
@@ -320,7 +320,6 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
                     callback_data=f"copy_ref_{user_data['telegram_id']}",
                 )
             )
-           
 
         try:
             course = await get_course_for_next_level_by_user_level(user_data.get("level"))
