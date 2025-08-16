@@ -756,7 +756,7 @@ class TelegramUserAdmin(ModelAdmin):
             "Tasdiqlash",
             {"fields": ("is_confirmed", "confirmed_by", "confirmation_date")},
         ),
-        ("Huquqlar", {"fields": ("is_admin", "is_blocked", "inactive_time", "is_looser")}),
+        ("Huquqlar", {"fields": ("is_admin", "is_blocked", "is_looser")}),
         ("Faoliyat", {"fields": ("registration_date",), "classes": ("collapse",)}),
     )
 
