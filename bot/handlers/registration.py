@@ -371,6 +371,7 @@ async def show_subscription_request(
             parse_mode="HTML"
         )
 
+
 async def show_stages_content(message: types.Message, user_id: int, referral_message: str = ""):
     """Show stages content after verification"""
     user_level = await get_user_level(telegram_id=user_id)

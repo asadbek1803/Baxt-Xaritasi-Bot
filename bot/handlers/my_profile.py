@@ -50,8 +50,6 @@ async def my_profile_handler(message: types.Message, bot: Bot):
             )
             return
 
-        user_level_formatted = format_user_level(user_data.get("level"))
-
         # Referrer display (we already have invited_by in user_data, but use helper to be safe)
         invited = user_data.get("invited_by")
         if invited:
@@ -119,34 +117,11 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                     callback_data=f"stats_{user_data['telegram_id']}",
                 )
             )
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="📋 Referal linkni nusxalash",
-                    callback_data=f"copy_ref_{user_data['telegram_id']}",
-                )
-            )
-            
-            
-
-        # Kurs sotib olish tugmasi (har doim ko'rsatiladi)
-        try:
-            course = await get_course_for_next_level_by_user_level(
-                user_data.get("level")
-            )
-            if course:
-                builder.row(
-                    types.InlineKeyboardButton(
-                        text="🛒 Kurs sotib olish",
-                        callback_data=f"buy_course_{course['id']}",
-                    )
-                )
-        except Exception as e:
-            print(f"[my_profile_handler] Error getting course for buttons: {e}")
 
         builder.row(
             types.InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_home")
         )
-        
+
         # Send message with or without keyboard
         try:
             if builder.export():
@@ -206,19 +181,12 @@ async def copy_referral_link(callback: types.CallbackQuery):
             f"🔗 Qo'shilish uchun: {referral_link}\n\n"
             f"⚡️ Imkoniyatni qo'ldan boy bermang!"
         )
-        
-        # URL encode qilish
-        from urllib.parse import quote
-        encoded_text = quote(share_text)
-        
-        # Share tugmasini yaratish
         builder.row(
             types.InlineKeyboardButton(
                 text="📤 Ulashish",
                 switch_inline_query=share_text
             )
         )
-        
         # Linkni nusxalash tugmasi
         builder.row(
             types.InlineKeyboardButton(
@@ -226,7 +194,6 @@ async def copy_referral_link(callback: types.CallbackQuery):
                 callback_data=f"copy_link_{user_id}"
             )
         )
-        
         # Ortga qaytish tugmasi
         builder.row(
             types.InlineKeyboardButton(
@@ -382,11 +349,7 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
         print(f"[back_to_profile_handler] Error: {e}")
         await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)
     try:
-        parts = callback.data.split("_")
-        if len(parts) < 2:
-            await callback.answer("❌ Xato callback data!", show_alert=True)
-            return
-        user_id = parts[1]
+        user_id = callback.message.from_user.id
 
         user_data = await get_user_profile_by_telegram_id(user_id)
         if not user_data:

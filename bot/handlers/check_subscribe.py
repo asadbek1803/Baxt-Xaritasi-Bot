@@ -4,6 +4,9 @@ from aiogram import Router, Bot, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.utils.markdown import hbold
+from aiogram.fsm.context import FSMContext
+
+from bot.handlers.registration import complete_registration
 from bot.selectors import (
     get_all_channels,
     get_user,
@@ -18,15 +21,14 @@ import html
 
 router = Router()
 
+
 async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> List:
     """Check user subscriptions with same logic as middleware"""
     not_subscribed = []
     telegram_channels = [ch for ch in channels if ch.is_telegram]
-    
     for channel in telegram_channels:
         chat_identifier = None
-        
-        # Try telegram_id first
+
         if channel.telegram_id:
             chat_identifier = channel.telegram_id
             try:
@@ -37,15 +39,17 @@ async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> Li
                 if member.status in ["left", "kicked"]:
                     not_subscribed.append(channel)
                 continue
-            except (TelegramBadRequest, TelegramForbiddenError):
-                logging.warning(f"Failed with telegram_id for {channel.name}")
+
+            except (TelegramBadRequest, TelegramForbiddenError) as e:
+                logging.warning(f"Telegram ID {channel.telegram_id} bilan xatolik: {e}. Username bilan urinib ko'ramiz.")
             except Exception as e:
                 logging.warning(f"Unexpected error with telegram_id: {e}")
 
         # Fallback to username from link
         if channel.link and channel.link.startswith("https://t.me/"):
             username = channel.link.split("/")[-1]
-            chat_identifier = f"@{username}"
+            chat_identifier = "@" + username
+
             try:
                 member = await bot.get_chat_member(
                     chat_id=chat_identifier,
@@ -60,8 +64,9 @@ async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> Li
                 not_subscribed.append(channel)
         else:
             not_subscribed.append(channel)
-    
+
     return not_subscribed
+
 
 async def handle_verified_user(message: Message, user_id: int):
     """Handle post-verification flow consistent with middleware"""
@@ -92,6 +97,7 @@ async def handle_verified_user(message: Message, user_id: int):
         logging.error(f"Verified user flow error: {e}")
         await message.answer(Messages.system_error.value)
 
+
 async def show_user_content(message: Message, user_id: int):
     """Show appropriate content for verified user"""
     try:
@@ -111,6 +117,7 @@ async def show_user_content(message: Message, user_id: int):
     except Exception as e:
         logging.error(f"Error showing user content: {e}")
         await message.answer(Messages.system_error.value)
+
 
 async def show_level_content(message: Message, user_id: int):
     """Show content based on user level"""
@@ -138,6 +145,7 @@ async def show_level_content(message: Message, user_id: int):
 
     await message.answer(text=text, reply_markup=keyboard, parse_mode="HTML")
 
+
 async def show_subscription_request(
     message: Message, 
     not_subscribed_channels: List,
@@ -151,9 +159,9 @@ async def show_subscription_request(
     try:
         text = "🎉 Registratsiya muvaffaqiyatli yakunlandi!" + referral_message
         text += "\n\n📢 Botdan to'liq foydalanish uchun quyidagi majburiy kanallarga a'zo bo'ling:\n\n"
-        
+
         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-        
+
         # Required channels
         for channel in not_subscribed_channels:
             name = html.escape(channel.name or "Kanal")
@@ -161,7 +169,7 @@ async def show_subscription_request(
                 [InlineKeyboardButton(text=f"📢 {name}", url=channel.link)]
             )
             text += f"📢 {name}\n"
-        
+
         # Additional channels
         if other_channels:
             text += "\n🌐 Qo'shimcha homiy kanallar:\n"
@@ -171,7 +179,7 @@ async def show_subscription_request(
                     [InlineKeyboardButton(text=f"🌐 {name}", url=channel.link)]
                 )
                 text += f"🌐 {name}\n"
-        
+
         # Verification button
         keyboard.inline_keyboard.append([
             InlineKeyboardButton(
@@ -179,19 +187,20 @@ async def show_subscription_request(
                 callback_data="check_subscription"
             )
         ])
-        
+
         text += "\n💡 <b>Majburiy kanallarga a'zo bo'lgandan so'ng tekshirish tugmasini bosing!</b>"
-        
+
         await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
     except Exception as e:
         logging.error(f"Subscription message error: {e}")
         await message.answer("📢 Iltimos, barcha kanallarga a'zo bo'ling!")
 
+
 @router.callback_query(F.data == "check_subscription")
 async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
     """Handle subscription check with same logic as middleware"""
     user_id = callback.from_user.id
-    
+
     try:
         channels = await get_all_channels()
         if not channels:
@@ -200,10 +209,8 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
 
         # Separate channel types like middleware
         telegram_channels = [ch for ch in channels if ch.is_telegram]
-        other_channels = [ch for ch in channels if not ch.is_telegram]
-        
         not_subscribed = await check_user_subscriptions(bot, user_id, telegram_channels)
-        
+
         if not_subscribed:
             channel_names = "\n".join([f"• {ch.name}" for ch in not_subscribed])
             await callback.answer(
@@ -213,10 +220,11 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
         else:
             await callback.answer("✅ A'zolik tasdiqlandi!")
             await handle_verified_user(callback.message, user_id)
-            
+
     except Exception as e:
         logging.error(f"Subscription check error: {e}")
         await callback.answer("⚠️ Tekshirishda xatolik yuz berdi!", show_alert=True)
+
 
 async def force_subscription_check(message: Message, bot: Bot) -> bool:
     """Force check matching middleware logic"""
@@ -227,9 +235,9 @@ async def force_subscription_check(message: Message, bot: Bot) -> bool:
 
         telegram_channels = [ch for ch in channels if ch.is_telegram]
         other_channels = [ch for ch in channels if not ch.is_telegram]
-        
+
         not_subscribed = await check_user_subscriptions(bot, message.from_user.id, telegram_channels)
-        
+
         if not_subscribed:
             await show_subscription_request(
                 message,
@@ -237,7 +245,7 @@ async def force_subscription_check(message: Message, bot: Bot) -> bool:
                 other_channels=other_channels
             )
             return False
-        
+
         return True
     except Exception as e:
         logging.error(f"Force check error: {e}")
