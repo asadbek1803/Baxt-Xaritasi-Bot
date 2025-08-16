@@ -199,7 +199,7 @@ async def referral_tree_callback(query: types.CallbackQuery):
         await query.answer("❌ Xatolik yuz berdi!", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("ref_stats:"))
+@router.callback_query(F.data.startswith("ref_stats"))
 async def referral_stats_callback(query: types.CallbackQuery):
     """Referal statistikasi"""
     try:
