@@ -143,9 +143,12 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
         await callback.answer(f"✅ {level_name} bosqichi tugallangan!", show_alert=True)
 
     elif stage_type == "available":
-        # Bu level uchun kurs topish
-        if user.invited_by:
-            invited_by = user.invited_by
+        invited_by = user.invited_by
+        if invited_by:
+
+            if not invited_by.is_admin:
+                invited_by = invited_by.invited_by
+
             if invited_by.level == user.level:
                 await callback.message.answer(
                     f"Sizni taklif qilgan: @{invited_by.telegram_username} hali keyingi bosqichga o'tgani yo'q 24 soat ichida qayta urinib ko'ring yoki @admin ga bog'laning"
