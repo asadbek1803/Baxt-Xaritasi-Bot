@@ -659,7 +659,7 @@ class KurslarAdmin(ModelAdmin):
 
     fieldsets = (
         ("Yashirin kanallar", {"fields": ("private_channel",)}),
-        ("Asosiy Ma'lumotlar", {"fields": ("name", "level", "description", "price")}),
+        ("Asosiy Ma'lumotlar", {"fields": ("name", "level", "description", "price", "referral_payment_amount")}),
         ("Vaqt Sozlamalari", {"fields": ("start_date", "end_date", "is_active")}),
     )
 
