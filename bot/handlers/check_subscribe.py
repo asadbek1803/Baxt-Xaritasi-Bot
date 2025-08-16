@@ -5,7 +5,9 @@ from aiogram import Router, Bot, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.utils.markdown import hbold
+from aiogram.fsm.context import FSMContext
 
+from bot.handlers.registration import complete_registration
 from bot.selectors import (
     get_all_channels,
     get_user,
@@ -23,14 +25,11 @@ async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> Li
     """Foydalanuvchi barcha Telegram kanallarga obuna bo'lganligini tekshiradi va obuna bo'lmaganlarini qaytaradi"""
     not_subscribed = []
 
-    # Faqat Telegram kanallarini tekshiramiz
     telegram_channels = [ch for ch in channels if ch.is_telegram]
-    
     for channel in telegram_channels:
         chat_identifier = None
         channel_found = False
 
-        # Avval telegram_id bilan urinish
         if channel.telegram_id:
             chat_identifier = channel.telegram_id
             try:
@@ -41,8 +40,8 @@ async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> Li
                 if member.status in ["left", "kicked"]:
                     not_subscribed.append(channel)
                 channel_found = True
-                continue  # Muvaffaqiyatli bo'lsa, keyingi kanalga o'tamiz
-                
+                continue
+
             except (TelegramBadRequest, TelegramForbiddenError) as e:
                 logging.warning(f"Telegram ID {channel.telegram_id} bilan xatolik: {e}. Username bilan urinib ko'ramiz.")
             except Exception as e:
@@ -52,7 +51,7 @@ async def check_user_subscriptions(bot: Bot, user_id: int, channels: List) -> Li
         if not channel_found and channel.link and channel.link.startswith("https://t.me/"):
             username = channel.link.split("/")[-1]
             chat_identifier = "@" + username
-            
+
             try:
                 member = await bot.get_chat_member(
                     chat_id=chat_identifier,
@@ -128,7 +127,7 @@ async def handle_new_user_flow(callback: CallbackQuery, user_id: int):
 
 
 @router.callback_query(F.data == "check_subscription")
-async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
+async def handle_subscription_check(callback: CallbackQuery, bot: Bot, state: FSMContext):
     """
     Foydalanuvchi kanallarni tekshiradi.
     Agar obuna bo'lmagan Telegram kanali bo'lsa — callback orqali ogohlantiradi.
@@ -147,7 +146,8 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
         else:
             # Hamma majburiy kanallarga a'zo bo'lsa → yangi oqim
             await callback.answer("✅ A'zolik tasdiqlandi!", show_alert=False)
-            await handle_new_user_flow(callback, user_id)
+            await callback.message.delete()
+            await complete_registration(callback.message, state, user_id, callback.from_user.username)
 
     except Exception as e:
         logging.error(f"A'zolikni tekshirishda umumiy xatolik: {e}")

@@ -159,17 +159,12 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
         course = await get_level_kurs(level_name)
 
         if course:
-            text = f"""
-            🎯 <b>{level_name} bosqichi</b>
-
-            Bu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:
-
-            📚 <b>{course.name}</b>
-            💰 Narxi: {course.price:,} so'm
-            📖 Ta'rif: {course.description}
-
-            Kursni sotib olishni xohlaysizmi?
-            """
+            text = f"🎯 <b>{level_name}</b>"
+            text += "\n\nBu bosqichni tugallash uchun quyidagi kursni sotib olishingiz kerak:\n\n"
+            text += f"📚 <b>{course.name}</b>\n"
+            text += f"💰 Narxi: {course.price:,} so'm\n"
+            text += f"📖 Ta'rif: {course.description}\n"
+            text += "\n\nKursni sotib olishni xohlaysizmi?"
 
             keyboard_buttons = []
 

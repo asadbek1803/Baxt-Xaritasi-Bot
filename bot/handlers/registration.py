@@ -175,7 +175,6 @@ async def process_profession_callback(callback: types.CallbackQuery, state: FSMC
 
 # Registratsiyani yakunlash funksiyasi
 async def complete_registration(message: types.Message, state: FSMContext, user_id: int, username: str):
-    # Username tekshirish
     if not username:
         await message.answer("❌ Iltimos, avval Telegram profilingizga username qo'ying!")
         return

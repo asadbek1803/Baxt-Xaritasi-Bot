@@ -120,12 +120,6 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                     callback_data=f"stats_{user_data['telegram_id']}",
                 )
             )
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="📋 Referal linkni nusxalash",
-                    callback_data=f"copy_ref_{user_data['telegram_id']}",
-                )
-            )
         else:
             # show course-related buttons
             try:
@@ -144,13 +138,6 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                             f"\n\n<b>⚠️ Darajani oshirish uchun ⚠️ </b>\n"
                             f"1. Referral yaratish: <b>{course['referral_name']}</b>"
                         )
-
-                    builder.row(
-                        types.InlineKeyboardButton(
-                            text="🛒 Kurs sotib olish",
-                            callback_data=f"buy_course_{course['id']}",
-                        )
-                    )
 
             except Exception as e:
                 print(f"[my_profile_handler] Error getting course for buttons: {e}")
@@ -221,11 +208,7 @@ async def copy_referral_link(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("stats_"))
 async def show_user_stats(callback: types.CallbackQuery):
     try:
-        parts = callback.data.split("_")
-        if len(parts) < 2:
-            await callback.answer("❌ Xato callback data!", show_alert=True)
-            return
-        user_id = parts[1]
+        user_id = callback.message.from_user.id
 
         user_data = await get_user_profile_by_telegram_id(user_id)
         if not user_data:
