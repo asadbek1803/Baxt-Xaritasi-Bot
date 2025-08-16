@@ -6,6 +6,7 @@ from .models import TelegramUser, ReferrerUpdateQueue
 from .selectors import find_suitable_referrers_for_user, replace_referrer_by_admin, compare_levels
 from .services.notification import notify_referrer_warning, notify_referral_removed, notify_referrer_changed, notify_new_referral
 
+
 @shared_task(bind=True)
 def check_referral_levels_after_update(self, user_telegram_id):
     """
@@ -25,6 +26,7 @@ def check_referral_levels_after_update(self, user_telegram_id):
             'error': str(e),
             'user_id': user_telegram_id
         }
+
 
 @shared_task(bind=True)
 def process_pending_referrer_updates(self):
@@ -118,6 +120,7 @@ def process_pending_referrer_updates(self):
         'total_processed': len(results),
         'results': results
     }
+
 
 @shared_task(bind=True)
 def notify_referrer_about_level_issue(self, user_telegram_id, referrer_telegram_id):
