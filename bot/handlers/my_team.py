@@ -288,7 +288,7 @@ async def show_referral_stats(query: types.CallbackQuery, user_id: str):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="◀️ Orqaga", callback_data=f"team_page:{user_id}:0"
+                    text="◀️ Orqaga", callback_data="back_to_home"
                 )
             ]
         ]
