@@ -44,7 +44,6 @@ def timeout(seconds=10):
 async def create_referral(callback: types.CallbackQuery, state: FSMContext):
     try:
         user_id = str(callback.from_user.id)
-        course_id = callback.data.split("_")[-1]
 
         # Get root referrer
         root_referrer = await get_root_referrer(user_id)

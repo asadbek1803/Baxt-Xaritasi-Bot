@@ -138,7 +138,9 @@ async def update_user(
         "gender",
         "level",
         "invited_by",
-        "referral_code",  # Yangi maydonlar qo'shildi
+        "referral_code",
+        "inactive_time",
+        "is_looser"
     }
 
     # Filter and validate update data
@@ -158,6 +160,8 @@ async def update_user(
             "referral_code": referral_code,
             "card_number": card_number,
             "card_holder_full_name": card_holder_full_name,
+            "inactive_time": inactive_time,
+            "is_looser": is_looser
         }.items()
         if k in allowed_fields and v is not None
     }

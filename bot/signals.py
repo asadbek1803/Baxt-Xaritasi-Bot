@@ -101,7 +101,7 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
                     "2️⃣ To'lov tasdiqlangach, sizga maxsus referral kod beriladi\n"
                     "3️⃣ Bu kod orqali boshqalarni taklif qilganingizda:\n"
                     "   - Ular ham 200,000 so'm to'lashadi\n"
-                    "   - To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal 200 ming so'mdan sizga to'lov qilishadi.\n\n"
+                    f"   - To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal {instance.course.referral_payment_amount} ming so'mdan sizga to'lov qilishadi.\n\n"
                     "💳 To'lov uchun karta ma'lumotlari:\n"
                     f"Telefon raqami: {referral_recipient.phone_number}\n"
                     f"Telegram profili: @{referral_recipient.telegram_username}\n"
