@@ -1,5 +1,5 @@
 # stages.py - Tuzatilgan handler
-
+from asgiref.sync import sync_to_async
 from aiogram import types, Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -147,7 +147,7 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
         if invited_by:
 
             if not invited_by.is_admin:
-                invited_by = invited_by.invited_by
+                invited_by = await sync_to_async(lambda: invited_by.invited_by)()
 
             if invited_by.level == user.level:
                 await callback.message.answer(

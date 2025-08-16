@@ -40,7 +40,6 @@ def fetch_user(chat_id: str):
     return TelegramUser.objects.select_related("invited_by").filter(telegram_id=chat_id).first()
 
 
-
 async def get_user(chat_id: str) -> TelegramUser | None:
     """Foydalanuvchini olish - None yoki TelegramUser qaytaradi"""
     user = await fetch_user(chat_id)
