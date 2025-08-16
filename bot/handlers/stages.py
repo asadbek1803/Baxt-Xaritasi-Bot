@@ -151,11 +151,11 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
 
             if invited_by.level == user.level:
                 await callback.message.answer(
-                    f"Sizni taklif qilgan: @{invited_by.telegram_username} hali keyingi bosqichga o'tgani yo'q 24 soat ichida qayta urinib ko'ring yoki @admin ga bog'laning"
+                    f"Sizni jamoa a'zoyingiz: @{invited_by.telegram_username} hali keyingi bosqichga o'tgani yo'q 24 soat ichida qayta urinib ko'ring yoki @PsixologGulhayoMuminova ga bog'laning"
                 )
                 await callback.bot.send_message(
                     invited_by.telegram_id,
-                    f"Siz taklif qilgan: @{user.telegram_username} keyingi bosqichga o'tish uchun to'lov qilmoqchi lekin siz to'lovlarni qabul qila olishingiz uchun keyingi bosqichga to'lov qilishingiz kerak",
+                    f"Siz jamoa a'zoyingiz: @{user.telegram_username} keyingi bosqichga o'tish uchun to'lov qilmoqchi lekin siz to'lovlarni qabul qila olishingiz uchun keyingi bosqichga to'lov qilishingiz kerak! 24 soat vaqtingiz bor aks holda siz tanlovdan chetlashtirilasiz",
                 )
                 return
 
@@ -170,8 +170,6 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
             text += "\n\nKursni sotib olishni xohlaysizmi?"
 
             keyboard_buttons = []
-
-            # Agar user tasdiqlanmagan bo'lsa, referral opsiyasini ham ko'rsatish
             if not user.is_confirmed and not user.level == "level_0":
                 text += (
                     "\n\n💡 <b>Referral yaratish orqali ham kurs olishingiz mumkin!</b>"

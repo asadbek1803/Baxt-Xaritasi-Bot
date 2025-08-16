@@ -154,7 +154,8 @@ class TelegramUser(models.Model):
     is_admin = models.BooleanField(
         default=False, help_text="Foydalanuvchi adminmi", verbose_name="Admin"
     )
-
+    is_looser = models.BooleanField(default=False, verbose_name="Yutqazuvchi")
+    inactive_time = models.DateTimeField(auto_now=True)
     is_blocked = models.BooleanField(default=False, verbose_name="Bloklangan")
 
     def save(self, *args, **kwargs):

@@ -712,6 +712,8 @@ class TelegramUserAdmin(ModelAdmin):
         "is_admin",
         "referral_count",
         "registration_date",
+        "inactive_time",
+        "is_looser"
     )
     search_fields = ("full_name", "telegram_username", "phone_number", "telegram_id")
     list_filter = (

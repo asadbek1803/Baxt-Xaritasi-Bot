@@ -121,6 +121,8 @@ async def update_user(
     referral_code: str = None,  # Yangi maydon qo'shildi
     card_number: str = None,
     card_holder_full_name: str = None,
+    is_looser: bool = None,
+    inactive_time: str = None
 ) -> bool:
     """
     Updates user data with proper connection handling and validation
