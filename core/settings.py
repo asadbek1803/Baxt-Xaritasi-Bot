@@ -47,24 +47,37 @@ LOGGING = {
     },
 }
 
+
 CORS_ALLOW_CREDENTIALS = True
-CORS_ORIGIN_ALLOW_ALL = True
-CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1:8000",
-    "http://localhost:8000",
+CORS_ORIGIN_ALLOW_ALL = False  # Better to explicitly whitelist
+CORS_REPLACE_HTTPS_REFERER = True
+
+# Update these lists
+CORS_ORIGIN_WHITELIST = [
     "https://newlive.uz",
     "http://newlive.uz",
+    "https://27a34e8e96dd.ngrok-free.app",
+    "https://d74fed7cf4a7.ngrok-free.app",
     "https://0aaca1b5a486.ngrok-free.app",
-    "http://0aaca1b5a486.ngrok-free.app",
-    "https://d74fed7cf4a7.ngrok-free.app"
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
 ]
 
-CORS_REPLACE_HTTPS_REFERER = True
-CSRF_COOKIE_DOMAIN = "d74fed7cf4a7.ngrok-free.app"
-CORS_ORIGIN_WHITELIST = ("https://newlive.uz", "http://newlive.uz","https://bfa02bcc6c2e.ngrok-free.app", "https://d74fed7cf4a7.ngrok-free.app", "http://0aaca1b5a486.ngrok-free.app")
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+CSRF_TRUSTED_ORIGINS = [
+    "https://newlive.uz",
+    "http://newlive.uz",
+    "https://27a34e8e96dd.ngrok-free.app",
+    "https://d74fed7cf4a7.ngrok-free.app",
+    "https://0aaca1b5a486.ngrok-free.app",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
+]
 
+# Set CSRF cookie domain (use None for local development)
+CSRF_COOKIE_DOMAIN = None  # Or ".ngrok-free.app" if using ngrok in production
+CSRF_COOKIE_SECURE = True  # For HTTPS
+CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to access it
+CSRF_COOKIE_SAMESITE = 'Lax'  # Or 'None' if needed for cross-site
 # Celery sozlamalari
 
 CELERY_ACCEPT_CONTENT = ["json"]

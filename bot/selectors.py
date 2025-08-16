@@ -927,6 +927,8 @@ def get_user_profile_by_telegram_id(telegram_id: str):
             "level": getattr(user, "level", "0-bosqich"),
             "referral_count": getattr(user, "referral_count", 0),
             "is_confirmed": bool(user.is_confirmed),
+            "referral_link": user.get_referral_link() if hasattr(user, "get_referral_link") else f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={user.telegram_id}",
+            "referral_code": getattr(user, "referral_code", None),
             "invited_by": invited_data,
         }
     except Exception as e:
