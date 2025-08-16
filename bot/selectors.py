@@ -266,6 +266,11 @@ def get_level_kurs(level):
         else:
             # level raqam bo'lsa
             course_level = f"level_{level}"
+            
+        # Agar level_0 bo'lsa, level_1 qidirish
+        if course_level == "level_0":
+            course_level = "level_1"
+            print(f"Level_0 detected, searching for {course_level} instead")
         
         print(f"Looking for course with level: {course_level}")
         
