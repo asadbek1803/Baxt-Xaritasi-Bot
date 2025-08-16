@@ -60,6 +60,9 @@ async def show_card_info(callback: types.CallbackQuery):
                     callback_data=f"edit_card_{user_id}",
                 )
             )
+            builder.row(
+            types.InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_home")
+        )
         else:
             # Agar karta ma'lumotlari yo'q bo'lsa - qo'shish tugmasi
             builder.row(
@@ -68,6 +71,9 @@ async def show_card_info(callback: types.CallbackQuery):
                     callback_data=f"add_card_{user_id}",
                 )
             )
+            builder.row(
+            types.InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_home")
+        )
 
         await callback.message.edit_text(
             text=card_info_text, reply_markup=builder.as_markup(), parse_mode="HTML"

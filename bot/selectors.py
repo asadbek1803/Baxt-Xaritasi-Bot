@@ -266,6 +266,11 @@ def get_level_kurs(level):
         else:
             # level raqam bo'lsa
             course_level = f"level_{level}"
+            
+        # Agar level_0 bo'lsa, level_1 qidirish
+        if course_level == "level_0":
+            course_level = "level_1"
+            print(f"Level_0 detected, searching for {course_level} instead")
         
         print(f"Looking for course with level: {course_level}")
         
@@ -927,6 +932,8 @@ def get_user_profile_by_telegram_id(telegram_id: str):
             "level": getattr(user, "level", "0-bosqich"),
             "referral_count": getattr(user, "referral_count", 0),
             "is_confirmed": bool(user.is_confirmed),
+            "referral_link": user.get_referral_link() if hasattr(user, "get_referral_link") else f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={user.telegram_id}",
+            "referral_code": getattr(user, "referral_code", None),
             "invited_by": invited_data,
         }
     except Exception as e:

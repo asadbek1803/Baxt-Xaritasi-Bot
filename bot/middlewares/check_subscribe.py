@@ -32,10 +32,7 @@ class ChannelMembershipMiddleware(BaseMiddleware):
         user_id = event.from_user.id
         message = event.message if isinstance(event, CallbackQuery) else event
 
-        # Registratsiya jarayonida yoki 'check_subscription' tugmasi bosilganda middleware'ni o'tkazib yuborish
-        if isinstance(event, CallbackQuery) and event.data == "check_subscription":
-            return await handler(event, data)
-
+        # Registratsiya jarayonida middleware'ni o'tkazib yuborish
         state: FSMContext = data.get("state")
         if state:
             current_state = await state.get_state()
@@ -45,11 +42,23 @@ class ChannelMembershipMiddleware(BaseMiddleware):
                 UserRegistrationState.GET_REGION,
                 UserRegistrationState.GET_PROFESSION,
                 UserRegistrationState.GET_GENDER,
+                UserRegistrationState.GET_AGE,
             ]:
                 return await handler(event, data)
 
+        # 'check_subscription' tugmasi bosilganda alohida ishlov berish
+        if isinstance(event, CallbackQuery) and event.data in ["check_subscription", "check_subscription_middleware"]:
+    
+            return await handler(event, data)
+
         user = await get_user(str(user_id))
         if not user:
+            # Foydalanuvchi bazada yo'q bo'lsa (registratsiya qilmagan), middleware'ni o'tkazib yuborish
+            return await handler(event, data)
+
+        # ✅ YANGI: Foydalanuvchi yangi registratsiya qilgan bo'lsa, middleware'ni o'tkazib yuborish
+        # Agar user mavjud lekin subscription_checked False bo'lsa, demak yangi foydalanuvchi
+        if hasattr(user, 'subscription_checked') and not user.subscription_checked:
             return await handler(event, data)
 
         if self.skip_admins:
