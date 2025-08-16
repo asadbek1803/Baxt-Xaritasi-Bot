@@ -1,4 +1,5 @@
 import requests
+import time
 
 from asgiref.sync import async_to_sync
 from django.dispatch import receiver
@@ -82,18 +83,16 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
             }
             response = requests.post(BASE_URL, json=payload)
             response.raise_for_status()
-            
-           
+            time.sleep(10)
+
             referral_recipient = None
-            
             if instance.user.invited_by:
                 if instance.user.invited_by.is_admin:
                     referral_recipient = instance.user.invited_by
                 else:
                     if instance.user.invited_by.invited_by:
                         referral_recipient = instance.user.invited_by.invited_by
-            
-        
+
             if referral_recipient:
                 payment_message = (
                     "➡️ Keyingi qadam endi siz sizni bu loyihaga qo'shilishingizga sababchi bo'lgan liderga daromadini tashlab berishingiz kerak\n\n"
@@ -108,12 +107,12 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
                     f"Telegram profili: @{referral_recipient.telegram_username}\n"
                     "To'lov qilganingizdan so'ng pastdagi tugmani bosing:"
                 )
-                
+
                 referral_payment = async_to_sync(create_referral_payment_request)(
                     user_id=chat_id, 
                     amount=200_000
                 )
-                
+
                 reply_markup = InlineKeyboardMarkup(
                     inline_keyboard=[
                         [

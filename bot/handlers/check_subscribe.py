@@ -200,6 +200,7 @@ async def show_subscription_request(
 async def handle_subscription_check(callback: CallbackQuery, bot: Bot, state: FSMContext):
     """Handle subscription check with same logic as middleware"""
     user_id = callback.from_user.id
+    await callback.answer("⏳ Tekshirilmoqda...", show_alert=False)
 
     try:
         channels = await get_all_channels()
