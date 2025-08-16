@@ -359,6 +359,9 @@ class Kurslar(models.Model):
         verbose_name="Yaratilgan sana",
         help_text="Kurs qachon yaratilgan",
     )
+    referral_payment_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, verbose_name="Referral to'lovi miqdori"
+    )
     updated_at = models.DateTimeField(
         auto_now=True,
         verbose_name="Yangilangan sana",

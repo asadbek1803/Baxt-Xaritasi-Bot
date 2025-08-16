@@ -652,7 +652,7 @@ class PaymentsAdmin(ModelAdmin):
 @admin.register(Kurslar)
 class KurslarAdmin(ModelAdmin):
     inlines = [CoursePaymentsInline, CourseParticipantInline]
-    list_display = ("name", "level", "price", "is_active", "created_at")
+    list_display = ("name", "level", "price", "is_active", "created_at", "referral_payment_amount")
     search_fields = ("name", "description")
     list_filter = ("is_active", "level", "created_at")
     ordering = ("-created_at",)
