@@ -1,10 +1,7 @@
 import logging
-import html
 from aiogram import Router, types, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
-    Message,
-    CallbackQuery,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
@@ -20,11 +17,8 @@ from bot.buttons.default.gender import get_gender_keyboard
 from bot.utils.formatters import format_phone_number
 from bot.utils.helpers import get_region_code_by_name, get_gender_code_by_name
 from bot.services.user import create_user, get_user_by_referral_code
-from bot.services.subscribe import check_channels_after_registration
-from bot.buttons.inline.stages import get_stages_keyboard
 from bot.handlers.stages import get_stages_keyboard
 from bot.selectors import get_all_channels
-
 
 
 router = Router()
@@ -279,7 +273,7 @@ async def verify_and_show_content(message: types.Message, user_id: int, referral
 async def check_subscription_status(bot: Bot, user_id: int, channels: list) -> list:
     """Check which channels user is not subscribed to (middleware-style)"""
     not_subscribed = []
-    
+
     for channel in channels:
         try:
             # Try both telegram_id and link as identifier
@@ -305,7 +299,7 @@ async def check_subscription_status(bot: Bot, user_id: int, channels: list) -> l
         except Exception as e:
             logging.error(f"Unexpected error checking channel {channel.name}: {e}")
             not_subscribed.append(channel)
-    
+
     return not_subscribed
 
 
@@ -322,33 +316,33 @@ async def show_subscription_request(
     try:
         text = "🎉 Registratsiya muvaffaqiyatli yakunlandi!" + referral_message
         text += "\n\n📢 Botdan to'liq foydalanish uchun quyidagi majburiy kanallarga a'zo bo'ling:\n\n"
-        
+
         keyboard = InlineKeyboardMarkup(inline_keyboard=[])
-        
+
         # Majburiy Telegram kanallar
         for channel in not_subscribed_telegram_channels:
-            channel_name = html.escape(channel.name or "Kanal")
+            channel_name = channel.name
             button_text = f"📢 {channel_name}"
-            
+
             if channel.link:
                 keyboard.inline_keyboard.append(
                     [InlineKeyboardButton(text=button_text, url=channel.link)]
                 )
                 text += f"{button_text}\n"
-        
+
         # Qo'shimcha kanallar
         if other_channels:
             text += "\n🌐 Qo'shimcha homiy kanallar:\n"
             for channel in other_channels:
-                channel_name = html.escape(channel.name or "Kanal")
+                channel_name = channel.name
                 button_text = f"🌐 {channel_name}"
-                
+
                 if channel.link:
                     keyboard.inline_keyboard.append(
                         [InlineKeyboardButton(text=button_text, url=channel.link)]
                     )
                     text += f"{button_text}\n"
-        
+
         # Tekshirish tugmasi
         keyboard.inline_keyboard.append([
             InlineKeyboardButton(
@@ -356,9 +350,9 @@ async def show_subscription_request(
                 callback_data="check_subscription"
             )
         ])
-        
+
         text += "\n💡 <b>Majburiy kanallarga a'zo bo'lgandan so'ng tekshirish tugmasini bosing!</b>"
-        
+
         await message.answer(
             text,
             parse_mode="HTML",
