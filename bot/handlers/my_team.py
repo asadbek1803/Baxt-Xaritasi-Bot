@@ -203,7 +203,7 @@ async def referral_tree_callback(query: types.CallbackQuery):
 async def referral_stats_callback(query: types.CallbackQuery):
     """Referal statistikasi"""
     try:
-        _, user_id = query.data.split(":")
+        user_id = query.message.from_user.id
 
         # Faqat o'z statistikasini ko'ra olishi
         if str(query.from_user.id) != user_id:
