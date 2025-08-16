@@ -125,9 +125,9 @@ async def show_level_content(message: Message, user_id: int):
         return
 
     text = (
-        f"🎓 {hbold(course.name)}\n\n"
+        f"🎓 <b> {course.name} </b> \n\n"
         f"{course.description}\n\n"
-        f"💵 Narxi: {hbold(f'{course.price} so\'m')}"
+        f"💵 Narxi: <b> {course.price} </b> so\'m'"
     )
 
     keyboard = InlineKeyboardMarkup(
@@ -136,7 +136,7 @@ async def show_level_content(message: Message, user_id: int):
         ]
     )
 
-    await message.answer(text=text, reply_markup=keyboard)
+    await message.answer(text=text, reply_markup=keyboard, parse_mode="HTML")
 
 async def show_subscription_request(
     message: Message, 
