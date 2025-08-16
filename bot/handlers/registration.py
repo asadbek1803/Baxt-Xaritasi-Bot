@@ -263,7 +263,7 @@ async def verify_and_show_content(message: types.Message, user_id: int, referral
         if not_subscribed:
             # Show subscription request with the same format as middleware
             await show_subscription_request(
-                message, 
+                message,
                 not_subscribed_telegram_channels=not_subscribed,
                 other_channels=other_channels,
                 referral_message=referral_message
@@ -378,11 +378,11 @@ async def show_stages_content(message: types.Message, user_id: int, referral_mes
     purchased_course_levels = await get_user_purchased_courses_with_levels(user_id)
     course = await get_course_by_user_level(user_level)
     price_formatted = "{:,}".format(course.price)
-    
+
     text = "🎉 Registratsiya muvaffaqiyatli yakunlandi!" + referral_message
     text += f"\n\n{Messages.welcome_message_for_registration.value.format(price_formatted)}"
     text += "\n\n🚀 Endi kurslarimiz bilan tanishing:"
-    
+
     await message.answer(
         text,
         parse_mode="HTML",

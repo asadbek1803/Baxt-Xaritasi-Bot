@@ -6,7 +6,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.utils.markdown import hbold
 from aiogram.fsm.context import FSMContext
 
-from bot.handlers.registration import complete_registration
+from bot.handlers.registration import verify_and_show_content
 from bot.selectors import (
     get_all_channels,
     get_user,
@@ -197,7 +197,7 @@ async def show_subscription_request(
 
 
 @router.callback_query(F.data == "check_subscription")
-async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
+async def handle_subscription_check(callback: CallbackQuery, bot: Bot, state: FSMContext):
     """Handle subscription check with same logic as middleware"""
     user_id = callback.from_user.id
 
@@ -219,7 +219,8 @@ async def handle_subscription_check(callback: CallbackQuery, bot: Bot):
             )
         else:
             await callback.answer("✅ A'zolik tasdiqlandi!")
-            await handle_verified_user(callback.message, user_id)
+            await callback.message.delete()
+            await verify_and_show_content(callback.message, user_id)
 
     except Exception as e:
         logging.error(f"Subscription check error: {e}")
