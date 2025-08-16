@@ -194,10 +194,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "staticfiles")]
 MEDIA_URL = "/media/"  # Should be single /media/
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")  # Points to your media folder
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 # Admin CSS qo'shish uchun
 STATICFILES_FINDERS = [
