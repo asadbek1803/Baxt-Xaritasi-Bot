@@ -227,7 +227,7 @@ async def show_referral_tree(query: types.CallbackQuery, user_id: str):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="◀️ Orqaga", callback_data=f"team_page:{user_id}:0"
+                    text="◀️ Orqaga", callback_data="back_to_home"
                 )
             ]
         ]
@@ -236,7 +236,6 @@ async def show_referral_tree(query: types.CallbackQuery, user_id: str):
     try:
         await safe_edit_message(query, text, keyboard)
     except Exception:
-        # Agar edit ishlamasa, yangi xabar yuborish
         await query.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 
@@ -279,28 +278,10 @@ async def show_referral_stats(query: types.CallbackQuery, user_id: str):
     confirmed_referrals = await get_confirmed_referrals_count(user_id)
     pending_referrals = total_referrals - confirmed_referrals
 
-    # Daraja bo'yicha statistika
-    level_stats = await get_referrals_by_level(user_id)
-
-    # Bu oy qo'shilganlar
-    monthly_referrals = await get_monthly_referrals_count(user_id)
-
     text = "📊 <b>Referal statistikasi</b>\n"
-    text += f"🕐 <b>Yangilandi:</b> {datetime.now().strftime('%H:%M')}\n\n"
     text += f"👥 <b>Jami referallar:</b> {total_referrals} ta\n"
     text += f"✅ <b>Tasdiqlangan:</b> {confirmed_referrals} ta\n"
     text += f"⏳ <b>Kutilayotgan:</b> {pending_referrals} ta\n"
-    text += f"📅 <b>Bu oy:</b> {monthly_referrals} ta\n\n"
-
-    if level_stats:
-        text += "🏆 <b>Daraja bo'yicha taqsimot:</b>\n"
-        for level, count in level_stats.items():
-            text += f"   • {level}: {count} ta\n"
-        text += "\n"
-
-    # Mukofotlar (agar mavjud bo'lsa)
-    text += "🎁 <b>Mukofotlar:</b>\n"
-    text += f"🏅 Daraja: {'🥇 Oltin' if total_referrals >= 50 else '🥈 Kumush' if total_referrals >= 20 else '🥉 Bronza' if total_referrals >= 10 else '🔰 Yangi'}\n"
 
     # Orqaga qaytish tugmasi
     keyboard = InlineKeyboardMarkup(
