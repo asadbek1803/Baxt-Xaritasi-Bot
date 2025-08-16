@@ -311,27 +311,9 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
             builder.row(
                 types.InlineKeyboardButton(
                     text="📊 Statistikani ko'rish",
-                    callback_data=f"stats_{user_data['telegram_id']}",
+                    callback_data="ref_stats",
                 )
             )
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="📋 Referal linkni nusxalash",
-                    callback_data=f"copy_ref_{user_data['telegram_id']}",
-                )
-            )
-
-        try:
-            course = await get_course_for_next_level_by_user_level(user_data.get("level"))
-            if course:
-                builder.row(
-                    types.InlineKeyboardButton(
-                        text="🛒 Kurs sotib olish",
-                        callback_data=f"buy_course_{course['id']}",
-                    )
-                )
-        except Exception as e:
-            print(f"Error getting course: {e}")
 
         builder.row(
             types.InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_home")
