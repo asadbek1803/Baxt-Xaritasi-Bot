@@ -126,12 +126,7 @@ async def my_profile_handler(message: types.Message, bot: Bot):
                 )
             )
             
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="💳 Plastik karta ma'lumotlari",
-                    callback_data=f"card_info_{user_data['telegram_id']}",
-                )
-            )
+            
 
         # Kurs sotib olish tugmasi (har doim ko'rsatiladi)
         try:
@@ -358,13 +353,7 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
                     callback_data=f"copy_ref_{user_data['telegram_id']}",
                 )
             )
-            # Plastik karta ma'lumotlari qo'shish
-            builder.row(
-                types.InlineKeyboardButton(
-                    text="💳 Plastik karta ma'lumotlari",
-                    callback_data=f"card_info_{user_data['telegram_id']}",
-                )
-            )
+           
 
         try:
             course = await get_course_for_next_level_by_user_level(user_data.get("level"))
