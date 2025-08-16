@@ -204,12 +204,6 @@ async def referral_stats_callback(query: types.CallbackQuery):
     """Referal statistikasi"""
     try:
         user_id = query.message.from_user.id
-
-        # Faqat o'z statistikasini ko'ra olishi
-        if str(query.from_user.id) != user_id:
-            await query.answer("❌ Bu sizning statistikangiz emas!", show_alert=True)
-            return
-
         await show_referral_stats(query, user_id)
         await query.answer()
     except (ValueError, IndexError):
