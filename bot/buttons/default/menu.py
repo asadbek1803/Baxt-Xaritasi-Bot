@@ -6,6 +6,7 @@ def get_menu_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [
                 KeyboardButton(text="👤 Mening hisobim"),
+                KeyboardButton(text="🔗 Mening havolam"),
             ],
             [
                 KeyboardButton(text="📞 Aloqa"),
@@ -18,7 +19,7 @@ def get_menu_keyboard() -> ReplyKeyboardMarkup:
             [
                 KeyboardButton(text="❓ Yordam"),
                 KeyboardButton(text="🏆 Sovg'alar"),
-            ]
+            ],
         ],
         resize_keyboard=True,
         one_time_keyboard=True,
