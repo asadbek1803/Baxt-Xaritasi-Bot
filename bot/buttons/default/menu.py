@@ -9,16 +9,16 @@ def get_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="🔗 Mening havolam"),
             ],
             [
-                KeyboardButton(text="📞 Aloqa"),
+                KeyboardButton(text="👥 Mening jamoam"),
                 KeyboardButton(text="⚡️ Bosqichlar"),
             ],
             [
                 KeyboardButton(text="📑 Loyiha haqida"),
-                KeyboardButton(text="👥 Mening jamoam"),
+                KeyboardButton(text="🏆 Sovg'alar"),
             ],
             [
+                KeyboardButton(text="📞 Aloqa"),
                 KeyboardButton(text="❓ Yordam"),
-                KeyboardButton(text="🏆 Sovg'alar"),
             ],
         ],
         resize_keyboard=True,
