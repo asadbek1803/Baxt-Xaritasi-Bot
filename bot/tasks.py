@@ -116,7 +116,7 @@ def deactivate_inactive_users(self):
         deadline_for_activation = timezone.now()
 
         inactive_users = TelegramUser.objects.filter(
-            deadline_for_activation__date=deadline_for_activation.date(),
+            deadline_for_activation=deadline_for_activation.date(),
         )
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
