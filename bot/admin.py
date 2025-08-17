@@ -732,6 +732,9 @@ class TelegramUserAdmin(ModelAdmin):
     ordering = ("-registration_date",)
     date_hierarchy = "registration_date"
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(is_looser=False)
+
     # Fieldsets
     fieldsets = (
         ("Darajasi", {"fields": ("level",)}),

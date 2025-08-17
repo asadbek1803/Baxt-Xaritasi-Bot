@@ -113,12 +113,19 @@ def deactivate_inactive_users(self):
         )
 
         print(f"[INFO] Deactivating {inactive_users.count()} inactive users")
-
+        admin_user = TelegramUser.objects.filter(is_admin=True).first()
         for user in inactive_users:
             try:
                 user.is_active = False
+                user.is_looser = True
                 user.deadline_for_activation = None
                 user.save()
+
+                invitees = TelegramUser.objects.filter(invited_by=user)
+
+                for invitee in invitees:
+                    invitee.invited_by = admin_user
+                    invitee.save()
 
                 # Notify user about deactivation
                 bot.send_message(
