@@ -1,14 +1,15 @@
-# my_profile.py
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import types
 from aiogram import Router, Bot, F
+from django.utils import timezone
+
 from bot.selectors import (
     get_user_profile_by_telegram_id,
     get_referrer_display_by_telegram_id,
-    get_course_for_next_level_by_user_level,
     get_referral_link_for_user,
 )
 from bot.buttons.default.back import get_back_keyboard
+from bot.models import TelegramUser
 
 router = Router()
 
@@ -320,10 +321,6 @@ async def copy_link_only(callback: types.CallbackQuery):
 
 @router.callback_query(F.data == "stats")
 async def show_user_stats(callback: types.CallbackQuery):
-    """Foydalanuvchi statistikasini ko'rsatish"""
-    print(f"[DEBUG] Statistics button clicked by user {callback.from_user.id}")
-    print(f"[DEBUG] Callback data: {callback.data}")
-    print(f"[DEBUG] Callback message ID: {callback.message.message_id}")
     try:
         user_id = str(callback.from_user.id)
         print(f"[DEBUG] Getting profile data for user {user_id}")
@@ -489,4 +486,54 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
 
     except Exception as e:
         print(f"[back_to_profile_handler] Error: {e}")
+        await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("confirm_activity_"))
+async def confirm_user_activity(callback: types.CallbackQuery):
+    """Foydalanuvchi aktivligini tasdiqlash"""
+    try:
+        # Extract user ID from callback data
+        user_id = callback.data.split("_")[2]
+
+        print(f"[DEBUG] Activity confirmation requested for user {user_id}")
+
+        # Get user data
+        user_data = await get_user_profile_by_telegram_id(user_id)
+
+        if not user_data:
+            await callback.answer("❌ Foydalanuvchi topilmadi!", show_alert=True)
+            return
+
+        # Check if the user is confirming their own activity
+        if str(callback.from_user.id) != user_id:
+            await callback.answer("❌ Bu tugma siz uchun emas!", show_alert=True)
+            return
+
+        user = TelegramUser.objects.get(telegram_id=user_id)
+        user.is_active = True
+        user.deadline_for_activation = None
+        user.last_activity_check = timezone.now()
+        user.save()
+
+        print(f"[DEBUG] User {user_id} activity confirmed successfully")
+
+        # Delete the message with the button
+        try:
+            await callback.message.delete()
+        except Exception as e:
+            print(f"[DEBUG] Could not delete message: {e}")
+
+        # Send confirmation message
+        await callback.message.answer(
+            "✅ <b>Aktivlik tasdiqlandi!</b>\n\n"
+            "Siz muvaffaqiyatli ravishda aktiv foydalanuvchi sifatida tasdiqlandingiz.\n"
+            "Endi siz botimizning barcha funksiyalaridan foydalana olasiz.",
+            parse_mode="HTML",
+        )
+
+        await callback.answer("✅ Aktivlik tasdiqlandi!")
+
+    except Exception as e:
+        print(f"[confirm_user_activity] Error: {e}")
         await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)

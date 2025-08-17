@@ -1,4 +1,5 @@
 # stages.py - Tuzatilgan handler
+from datetime import datetime, timedelta
 from asgiref.sync import sync_to_async
 from aiogram import types, Router, F
 from aiogram.fsm.context import FSMContext
@@ -158,7 +159,10 @@ async def handle_stage_callback(callback: types.CallbackQuery, state: FSMContext
                     invited_by.telegram_id,
                     f"Siz jamoa a'zoyingiz: @{user.telegram_username} keyingi bosqichga o'tish uchun to'lov qilmoqchi lekin siz to'lovlarni qabul qila olishingiz uchun keyingi bosqichga to'lov qilishingiz kerak! 24 soat vaqtingiz bor aks holda siz tanlovdan chetlashtirilasiz",
                 )
-                await update_user(chat_id=invited_by.telegram_id, is_looser=True, inactive_time="")
+                tomorrow = datetime.now() + timedelta(days=1)
+                await update_user(
+                    chat_id=invited_by.telegram_id, is_looser=True, inactive_time=tomorrow
+                )
                 return
 
         course = await get_level_kurs(level_name)

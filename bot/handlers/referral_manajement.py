@@ -216,11 +216,9 @@ async def process_referral_payment_screenshot(
         )
 
         try:
-            network_level = await get_network_level(str(message.from_user.id))
             caption = (
                 f"💰 Yangi referral to'lov!\n\n"
                 f"👤 Foydalanuvchi: {user.full_name} (ID: {user.telegram_id})\n"
-                f"📊 Tarmoq darajasi: {network_level}-daraja\n"
                 f"💳 Miqdor: {payment.amount:,} so'm\n\n"
                 "To'lovni tasdiqlaysizmi?"
             )

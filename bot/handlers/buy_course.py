@@ -36,8 +36,8 @@ async def buy_course(callback: types.CallbackQuery, state: FSMContext, bot: Bot)
 
     # Rekvizitlar matnini Messages ichidan olish
     rekvizitlar = Messages.payment_details.value.format(
-        card_number="8600 1234 5678 9012",
-        owner_name="Baxtiyor X",
+        card_number="4097830016541324",
+        owner_name="GULHAYO MOMINOVA",
         amount=course.price
     )
 

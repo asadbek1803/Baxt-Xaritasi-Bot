@@ -157,6 +157,8 @@ class TelegramUser(models.Model):
     is_looser = models.BooleanField(default=False, verbose_name="Yutqazuvchi")
     inactive_time = models.DateTimeField(auto_now=True)
     is_blocked = models.BooleanField(default=False, verbose_name="Bloklangan")
+    is_active = models.BooleanField(default=True)
+    deadline_for_activation = models.DateField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         import uuid

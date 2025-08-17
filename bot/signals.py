@@ -1,3 +1,4 @@
+from datetime import datetime
 import requests
 import time
 
@@ -5,12 +6,10 @@ from asgiref.sync import async_to_sync
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from aiogram.types import (
-    ReplyKeyboardMarkup,
-    KeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
-
+from bot.buttons.default.menu import get_menu_keyboard
 from bot.selectors import create_referral_payment_request
 from core.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME
 from .models import Payments, ReferralPayment
@@ -19,27 +18,7 @@ BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
 
 
 def get_menu_keyboard_json() -> dict:
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="👤 Mening hisobim")],
-            [
-                KeyboardButton(text="📞 Aloqa"),
-                KeyboardButton(text="⚡️ Bosqichlar"),
-            ],
-            [
-                KeyboardButton(text="📑 Loyiha haqida"),
-                KeyboardButton(text="👥 Mening jamoam"),
-            ],
-            [
-                KeyboardButton(text="❓ Yordam"),
-                KeyboardButton(text="🏆 Sovg'alar"),
-            ],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        row_width=2,
-    )
-    # None qiymatlarni chiqarib tashlash
+    keyboard = get_menu_keyboard()
     return keyboard.model_dump(exclude_none=True)
 
 
@@ -51,7 +30,11 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
     if instance.status == "CONFIRMED":
         instance._signal_handled = True
 
-        # confirm_payment() chaqirish
+        if instance.user.is_looser and instance.user.inactive_time > datetime.now():
+            instance.user.is_looser = False
+            instance.user.inactive_time = None
+            instance.user.save()
+
         try:
             instance.confirm_payment()
         except Exception as e:
@@ -85,6 +68,8 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
             response.raise_for_status()
             time.sleep(10)
 
+            referral_payment_amount = instance.course.referral_payment_amount
+
             referral_recipient = None
             if instance.user.invited_by:
                 if instance.user.invited_by.is_admin:
@@ -97,11 +82,11 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
                 payment_message = (
                     "➡️ Keyingi qadam endi siz sizni bu loyihaga qo'shilishingizga sababchi bo'lgan liderga daromadini tashlab berishingiz kerak\n\n"
                     "💡 Referral tizimi haqida:\n\n"
-                    "1️⃣ Siz avval 200,000 so'm to'lovni amalga oshirishingiz kerak\n"
+                    f"1️⃣ Siz avval {referral_payment_amount} so'm to'lovni amalga oshirishingiz kerak\n"
                     "2️⃣ To'lov tasdiqlangach, sizga maxsus referral kod beriladi\n"
                     "3️⃣ Bu kod orqali boshqalarni taklif qilganingizda:\n"
-                    "   - Ular ham 200,000 so'm to'lashadi\n"
-                    f"   - To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal {instance.course.referral_payment_amount} ming so'mdan sizga to'lov qilishadi.\n\n"
+                    f"- Ular ham {referral_payment_amount} so'm to'lashadi\n"
+                    f"- To'lovlar to'g'ridan-to'g'ri admin hisobiga o'tadi va ular o'z referallarini tarqatish orqali sizga daromad olib keladi. Har bir ular chaqirgan referal {referral_payment_amount} ming so'mdan sizga to'lov qilishadi.\n\n"
                     "💳 To'lov uchun karta ma'lumotlari:\n"
                     f"Telefon raqami: {referral_recipient.phone_number}\n"
                     f"Telegram profili: @{referral_recipient.telegram_username}\n"
@@ -109,8 +94,7 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
                 )
 
                 referral_payment = async_to_sync(create_referral_payment_request)(
-                    user_id=chat_id, 
-                    amount=200_000
+                    user_id=chat_id, amount=referral_payment_amount
                 )
 
                 reply_markup = InlineKeyboardMarkup(
@@ -134,7 +118,9 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
                 response.raise_for_status()
             else:
                 # Agar referral recipient topilmasa (masalan, to'g'ridan-to'g'ri admin tomonidan qo'shilgan)
-                print(f"[WARNING] User {instance.user.telegram_id} uchun referral recipient topilmadi")
+                print(
+                    f"[WARNING] User {instance.user.telegram_id} uchun referral recipient topilmadi"
+                )
 
         except Exception as e:
             print(f"Telegramga yuborishda xatolik: {e}")
@@ -170,17 +156,22 @@ def handle_referral_payment_confirmation(sender, instance, created, **kwargs):
     if instance.status == "CONFIRMED":
         user = instance.user
         instance._signal_handled = True
-        referral_link = f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={user.referral_code}"
+        referral_link = (
+            f"https://t.me/{TELEGRAM_BOT_USERNAME}?start={user.referral_code}"
+        )
         message = "Siznig to'lovingiz admin tomonidan tasdiqlandi \n\n"
         message += "🎯 Sizning Referral Ma'lumotlaringiz:\n\n"
         message += f"🆔 Referral ID: {user.telegram_id}\n"
         message += f"🔑 Referral kod: {user.referral_code}\n"
         message += f"👥 To'liq ismingiz: {user.full_name}\n"
         message += f"💰 To'langan summa: {instance.amount:,} so'm\n"
-        message += f"📅 To'lov vaqti: {instance.created_at.strftime('%d-%m-%Y %H:%M')}\n"
+        message += (
+            f"📅 To'lov vaqti: {instance.created_at.strftime('%d-%m-%Y %H:%M')}\n"
+        )
         message += "✅ Status: Tasdiqlandi\n\n"
-        message += "🔗 Sizning referral havolangiz:\n"
-        message += f"{referral_link}"
+        if user.level != "level_0":
+            message += "🔗 Sizning referral havolangiz:\n"
+            message += f"{referral_link}"
 
         payload = {
             "chat_id": user.telegram_id,

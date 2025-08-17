@@ -1,159 +1,136 @@
-# tasks.py fayliga quyidagilarni qo'shing
 from celery import shared_task
-from datetime import datetime, timedelta
 from django.utils import timezone
-from .models import TelegramUser, ReferrerUpdateQueue
-from .selectors import find_suitable_referrers_for_user, replace_referrer_by_admin, compare_levels
-from .services.notification import notify_referrer_warning, notify_referral_removed, notify_referrer_changed, notify_new_referral
+from datetime import timedelta
+from .models import TelegramUser
+from bot.views import bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 @shared_task(bind=True)
-def check_referral_levels_after_update(self, user_telegram_id):
-    """
-    Foydalanuvchi darajasi o'zgartirilganda referrer darajasini tekshirish
-    """
+def update_loosers_referalls_to_admin(self):
+    """Loserlarning referallarini admin userlarga o'tkazish"""
     try:
-        from .services.referral import handle_user_level_advancement
-        result = handle_user_level_advancement(user_telegram_id)
-        return {
-            'status': 'success',
-            'user_id': user_telegram_id,
-            'result': result
-        }
+        loosers = TelegramUser.objects.filter(
+            is_looser=True, inactive_time__date=timezone.now().date()
+        ).select_related("invited_by")
+
+        admin_user = TelegramUser.objects.filter(is_admin=True).first()
+
+        if not admin_user:
+            print("[ERROR] No admin user found")
+            return
+
+        for looser in loosers:
+            if looser.inactive_time < timezone.now():
+                # Get all invitees of this loser
+                invitees = TelegramUser.objects.filter(invited_by=looser)
+
+                for invitee in invitees:
+                    invitee.invited_by = admin_user
+                    invitee.save()
+
+                # Reset loser status
+                looser.is_looser = False
+                looser.inactive_time = None
+                looser.save()
+
+                print(
+                    f"[SUCCESS] Transferred {invitees.count()} invitees from loser {looser.telegram_id} to admin"
+                )
+
     except Exception as e:
-        return {
-            'status': 'error',
-            'error': str(e),
-            'user_id': user_telegram_id
-        }
+        print(f"[ERROR] Error in update_loosers_referalls_to_admin: {e}")
 
 
 @shared_task(bind=True)
-def process_pending_referrer_updates(self):
-    """
-    Barcha kutayotgan referrer yangilanishlarini qayta ishlash
-    """
-    from .models import ReferrerUpdateQueue
-    now = timezone.now()
-    
-    # 24 soatdan ortiq vaqt o'tgan yangilanishlarni olish
-    pending_updates = ReferrerUpdateQueue.objects.filter(
-        created_at__lte=now - timedelta(hours=24),
-        is_processed=False
-    )
-    
-    results = []
-    for update in pending_updates:
-        try:
-            # Referrer darajasini yangilaganligini tekshirish
-            referrer = TelegramUser.objects.get(telegram_id=update.referrer_telegram_id)
-            user = TelegramUser.objects.get(telegram_id=update.user_telegram_id)
-            
-            if compare_levels(referrer.level, user.level) >= 0:
-                # Agar referrer darajasini oshirgan bo'lsa
-                update.is_processed = True
-                update.status = 'RESOLVED'
-                update.save()
-                results.append({
-                    'user_id': update.user_telegram_id,
-                    'status': 'resolved',
-                    'message': 'Referrer updated their level'
-                })
-                continue
-                
-            # Admin referrerini topish (eng ko'p referralga ega admin)
-            admin_referrer = TelegramUser.objects.filter(
-                is_admin=True
-            ).order_by('-referral_count').first()
-            
-            if not admin_referrer:
-                continue
-                
-            # Referrerni almashtirish
-            replace_result = replace_referrer_by_admin(
-                user_telegram_id=update.user_telegram_id,
-                new_referrer_telegram_id=admin_referrer.telegram_id,
-                admin_telegram_id=admin_referrer.telegram_id
-            )
-            
-            if replace_result['success']:
-                # Eski referrerni xabardor qilish
-                notify_referral_removed(
-                    update.referrer_telegram_id,
-                    user.full_name,
-                    user.level
-                )
-                
-                # Yangi referrerni xabardor qilish
-                notify_new_referral(
-                    admin_referrer.telegram_id,
-                    user.full_name,
-                    user.level
-                )
-                
-                # Foydalanuvchini xabardor qilish
-                notify_referrer_changed(
-                    user.telegram_id,
-                    update.referrer.full_name,
-                    admin_referrer.full_name
-                )
-                
-                update.is_processed = True
-                update.status = 'AUTO_REPLACED'
-                update.save()
-                
-                results.append({
-                    'user_id': update.user_telegram_id,
-                    'status': 'auto_replaced',
-                    'new_referrer': admin_referrer.telegram_id
-                })
-                
-        except Exception as e:
-            results.append({
-                'user_id': update.user_telegram_id,
-                'status': 'error',
-                'error': str(e)
-            })
-    
-    return {
-        'processed_at': now.isoformat(),
-        'total_processed': len(results),
-        'results': results
-    }
-
-
-@shared_task(bind=True)
-def notify_referrer_about_level_issue(self, user_telegram_id, referrer_telegram_id):
-    """
-    Refererga daraja muammosi haqida ogohlantirish yuborish
-    """
+def check_active_users(self):
+    """Aktiv foydalanuvchilarni tekshirish va aktivlik tasdiqlash so'rovini yuborish"""
     try:
-        user = TelegramUser.objects.get(telegram_id=user_telegram_id)
-        referrer = TelegramUser.objects.get(telegram_id=referrer_telegram_id)
-        
-        # Ogohlantirish yuborish
-        notify_referrer_warning(
-            referrer_telegram_id,
-            user.full_name,
-            user.level,
-            referrer.level
+        # Get users who haven't confirmed activity in the last 48 hours
+        deadline_for_activation = timezone.now() + timedelta(hours=48)
+
+        users_to_check = TelegramUser.objects.filter(
+            is_active=True,
         )
-        
-        # Navbatga qo'shish
-        ReferrerUpdateQueue.objects.create(
-            user_telegram_id=user_telegram_id,
-            referrer_telegram_id=referrer_telegram_id,
-            user_level=user.level,
-            referrer_level=referrer.level
+
+        print(
+            f"[INFO] Checking {users_to_check.count()} users for activity confirmation"
         )
-        
-        return {
-            'status': 'success',
-            'user_id': user_telegram_id,
-            'referrer_id': referrer_telegram_id
-        }
+
+        for user in users_to_check:
+            try:
+                # Create inline keyboard with "Men aktivman" button
+                keyboard = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="✅ Men aktivman",
+                                callback_data=f"confirm_activity_{user.telegram_id}",
+                            )
+                        ]
+                    ]
+                )
+
+                # Send message with inline button
+                message_text = (
+                    "🔔 <b>Aktivlik tekshiruvi</b>\n\n"
+                    "Siz botimizdan aktiv tarzda foydalanmoqdamisiz? "
+                    "Iltimos, aktivligingizni quyidagi tugma orqali tasdiqlang.\n\n"
+                    "⏰ Sizda <b>48 soat</b> vaqt bor, aks holda loyihamizdan chetlashtirilasiz!"
+                )
+
+                bot.send_message(
+                    chat_id=user.telegram_id,
+                    text=message_text,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+
+                # Update last activity check time
+                user.deadline_for_activation = deadline_for_activation
+                user.save()
+
+                print(f"[SUCCESS] Activity check sent to user {user.telegram_id}")
+
+            except Exception as e:
+                print(
+                    f"[ERROR] Failed to send activity check to user {user.telegram_id}: {e}"
+                )
+                continue
+
     except Exception as e:
-        return {
-            'status': 'error',
-            'error': str(e)
-        }
+        print(f"[ERROR] Error in check_active_users: {e}")
+
+
+@shared_task(bind=True)
+def deactivate_inactive_users(self):
+    """48 soat ichida aktivlik tasdiqlanmagan foydalanuvchilarni deaktiv qilish"""
+    try:
+        deadline_for_activation = timezone.now()
+
+        inactive_users = TelegramUser.objects.filter(
+            deadline_for_activation__date=deadline_for_activation.date(),
+        )
+
+        print(f"[INFO] Deactivating {inactive_users.count()} inactive users")
+
+        for user in inactive_users:
+            try:
+                user.is_active = False
+                user.deadline_for_activation = None
+                user.save()
+
+                # Notify user about deactivation
+                bot.send_message(
+                    chat_id=user.telegram_id,
+                    text="❌ Siz 48 soat ichida aktivlik tasdiqlanmaganingiz uchun loyihamizdan chetlashtirildingiz.",
+                )
+
+                print(f"[SUCCESS] User {user.telegram_id} deactivated")
+
+            except Exception as e:
+                print(f"[ERROR] Failed to deactivate user {user.telegram_id}: {e}")
+                continue
+
+    except Exception as e:
+        print(f"[ERROR] Error in deactivate_inactive_users: {e}")
