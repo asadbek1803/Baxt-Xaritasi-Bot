@@ -1,9 +1,11 @@
 from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
 from .models import TelegramUser
 from bot.views import bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import asyncio
 
 
 @shared_task(bind=True)
@@ -79,12 +81,15 @@ def check_active_users(self):
                     "⏰ Sizda <b>48 soat</b> vaqt bor, aks holda loyihamizdan chetlashtirilasiz!"
                 )
 
-                bot.send_message(
-                    chat_id=user.telegram_id,
-                    text=message_text,
-                    parse_mode="HTML",
-                    reply_markup=keyboard,
-                )
+                async def send_activity_check():
+                    await bot.send_message(
+                        chat_id=user.telegram_id,
+                        text=message_text,
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+
+                asyncio.run(send_activity_check())
 
                 # Update last activity check time
                 user.deadline_for_activation = deadline_for_activation
@@ -128,9 +133,11 @@ def deactivate_inactive_users(self):
                     invitee.save()
 
                 # Notify user about deactivation
-                bot.send_message(
-                    chat_id=user.telegram_id,
-                    text="❌ Siz 48 soat ichida aktivlik tasdiqlanmaganingiz uchun loyihamizdan chetlashtirildingiz.",
+                asyncio.run(
+                    bot.send_message(
+                        chat_id=user.telegram_id,
+                        text="❌ Siz 48 soat ichida aktivlik tasdiqlanmaganingiz uchun loyihamizdan chetlashtirildingiz.",
+                    )
                 )
 
                 print(f"[SUCCESS] User {user.telegram_id} deactivated")
