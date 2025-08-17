@@ -2,7 +2,6 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from unfold.admin import ModelAdmin, TabularInline
-from django.utils.safestring import mark_safe
 from django.contrib import messages
 from django.utils import timezone
 from .models import (
@@ -21,10 +20,16 @@ from .models import (
 
 from django.contrib import admin
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.conf import settings
 import os
+
+
+class LooserUser(TelegramUser):
+    class Meta:
+        proxy = True
+        verbose_name = "Referali yangilanishi kerak bo'lgan foydalanuvchi"
+        verbose_name_plural = "Referali yangilanishi kerak bo'lgan foydalanuvchilar"
 
 
 @admin.register(ReferralPayment)
@@ -702,6 +707,73 @@ class MandatoryChannelAdmin(ModelAdmin):
 # TELEGRAMUSER ADMIN
 @admin.register(TelegramUser)
 class TelegramUserAdmin(ModelAdmin):
+    list_display = (
+        "full_name",
+        "telegram_username",
+        "phone_number",
+        "region",
+        "age",
+        "is_confirmed",
+        "is_admin",
+        "referral_count",
+        "registration_date",
+        "inactive_time",
+        "is_looser"
+    )
+    search_fields = ("full_name", "telegram_username", "phone_number", "telegram_id")
+    list_filter = (
+        "is_confirmed",
+        "is_admin",
+        "is_blocked",
+        "gender",
+        "region",
+        "registration_date",
+    )
+    ordering = ("-registration_date",)
+    date_hierarchy = "registration_date"
+
+    # Fieldsets
+    fieldsets = (
+        ("Darajasi", {"fields": ("level",)}),
+        (
+            "Telegram Ma'lumotlari",
+            {"fields": ("telegram_id", "telegram_username", "full_name")},
+        ),
+        ("Aloqa Ma'lumotlari", {"fields": ("phone_number", "region", "profession")}),
+        (
+            "Shaxsiy Ma'lumotlar",
+            {
+                "fields": (
+                    "gender",
+                    "age",
+                    "card_number"
+                )
+            },
+        ),
+        (
+            "Referral Tizimi",
+            {
+                "fields": ("invited_by", "referral_code", "referral_count"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Tasdiqlash",
+            {"fields": ("is_confirmed", "confirmed_by", "confirmation_date")},
+        ),
+        ("Huquqlar", {"fields": ("is_admin", "is_blocked", "is_looser")}),
+        ("Faoliyat", {"fields": ("registration_date",), "classes": ("collapse",)}),
+    )
+
+    readonly_fields = (
+        "registration_date",
+        "referral_count",
+        "age",
+    )
+
+
+@admin.register(LooserUser)
+class LooserUserAdmin(ModelAdmin):
     list_display = (
         "full_name",
         "telegram_username",

@@ -321,7 +321,7 @@ UNFOLD = {
                     {
                         "title": ("Referali yangilanadigan foydalanuvchilar"),
                         "link": reverse_lazy(
-                            "admin:bot_referrerupdatequeue_changelist"
+                            "admin:bot_looseruser_changelist"
                         ),
                         "icon": "account_circle",
                     },
