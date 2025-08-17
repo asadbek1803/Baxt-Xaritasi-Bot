@@ -53,7 +53,7 @@ def check_active_users(self):
         deadline_for_activation = timezone.now() + timedelta(hours=48)
 
         users_to_check = TelegramUser.objects.filter(
-            is_active=True,
+            is_active=True, is_admin=False
         )
 
         print(
