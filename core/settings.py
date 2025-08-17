@@ -10,7 +10,10 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-2)h%6&fi_(_3*uzd^gkep9)7ywo%c3y+cr-k2*g3dv=b0y@e#l")
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-2)h%6&fi_(_3*uzd^gkep9)7ywo%c3y+cr-k2*g3dv=b0y@e#l",
+)
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
@@ -60,7 +63,7 @@ CORS_ORIGIN_WHITELIST = [
     "https://d74fed7cf4a7.ngrok-free.app",
     "https://0aaca1b5a486.ngrok-free.app",
     "http://localhost:8000",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -70,14 +73,14 @@ CSRF_TRUSTED_ORIGINS = [
     "https://d74fed7cf4a7.ngrok-free.app",
     "https://0aaca1b5a486.ngrok-free.app",
     "http://localhost:8000",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
 ]
 
 # Set CSRF cookie domain (use None for local development)
 CSRF_COOKIE_DOMAIN = None  # Or ".ngrok-free.app" if using ngrok in production
 CSRF_COOKIE_SECURE = True  # For HTTPS
 CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to access it
-CSRF_COOKIE_SAMESITE = 'Lax'  # Or 'None' if needed for cross-site
+CSRF_COOKIE_SAMESITE = "Lax"  # Or 'None' if needed for cross-site
 # Celery sozlamalari
 
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -91,17 +94,20 @@ CELERY_RESULT_BACKEND = "redis://redis:6379/1"
 celery_app.conf.broker_url = "redis://redis:6379/0"
 celery_app.conf.result_backend = "redis://redis:6379/1"
 
-celery_app.conf.beat_schedule = {
-    "process-pending-referrer-updates": {
-        "task": "bot.tasks.process_pending_referrer_updates",
-        "schedule": crontab(minute="*/30"),  # Har 30 daqiqada ishlaydi
+CELERY_BEAT_SCHEDULE = {
+    "update_loosers_referalls_to_admin": {
+        "task": "bot.tasks.update_loosers_referalls_to_admin",
+        "schedule": crontab(minute=0),  # Har soat
     },
-    "check-all-referral-levels": {
-        "task": "bot.tasks.check_all_referral_levels",
-        "schedule": crontab(hour=3, minute=0),  # Har kuni soat 3:00 da
+    "check_active_users": {
+        "task": "bot.tasks.check_active_users",
+        "schedule": crontab(day_of_week="sunday", hour=0, minute=0),
+    },
+    "deactivate_inactive_users": {
+        "task": "bot.tasks.deactivate_inactive_users",
+        "schedule": crontab(hour=2, minute=0),  # Har kuni soat 2:00 da
     },
 }
-
 
 # Application definition
 
