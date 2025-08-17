@@ -156,6 +156,79 @@ async def my_profile_handler(message: types.Message, bot: Bot):
         await message.answer("❌ Profil ma'lumotlarini olishda xatolik yuz berdi.")
 
 
+@router.message(F.text == "🔗 Mening havolam")
+async def my_referral_link_handler(message: types.Message):
+    """Foydalanuvchining referral linkini ko'rsatish"""
+    try:
+        user_id = str(message.from_user.id)
+        print(f"[DEBUG] Referral link requested by user {user_id}")
+
+        # Get user profile data
+        user_data = await get_user_profile_by_telegram_id(user_id)
+
+        if not user_data:
+            await message.answer(
+                "❌ Sizning profilingiz topilmadi. Iltimos, avval ro'yxatdan o'ting."
+            )
+            return
+
+        if not user_data.get("referral_code"):
+            await message.answer(
+                "❌ Sizda referal kodi mavjud emas! Iltimos, admin bilan bog'laning."
+            )
+            return
+
+        # Get referral link
+        try:
+            referral_link = await get_referral_link_for_user(user_id)
+            print(
+                f"[DEBUG] Referral link generated for user {user_id}: {referral_link}"
+            )
+        except Exception as e:
+            print(f"[DEBUG] Error getting referral link for user {user_id}: {e}")
+            await message.answer("❌ Referral link olishda xatolik yuz berdi.")
+            return
+
+        # Create keyboard with share and copy options
+        builder = InlineKeyboardBuilder()
+
+        # Share button
+        share_text = (
+            f"🎯 Pul ishlash imkoniyati!\n\n"
+            f"💰 Referral dasturi orqali daromad oling!\n"
+            f"📈 Har bir yangi a'zo uchun bonus!\n\n"
+            f"🔗 Qo'shilish uchun: {referral_link}\n\n"
+            f"⚡️ Imkoniyatni qo'ldan boy bermang!"
+        )
+        builder.row(
+            types.InlineKeyboardButton(
+                text="📤 Ulashish", switch_inline_query=share_text
+            )
+        )
+
+        # Back to menu button
+        builder.row(
+            types.InlineKeyboardButton(
+                text="🔙 Menyuga qaytish", callback_data="back_to_home"
+            )
+        )
+
+        # Send referral link message
+        await message.answer(
+            f"🔗 <b>Sizning referral linkingiz</b>\n\n"
+            f"<code>{referral_link}</code>\n\n"
+            f"📤 <b>Ulashish:</b> Pastdagi tugma orqali do'stlaringiz, guruhlar yoki kanallarga ulashing\n\n",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+
+        print(f"[DEBUG] Referral link sent successfully to user {user_id}")
+
+    except Exception as e:
+        print(f"[my_referral_link_handler] Error: {e}")
+        await message.answer("❌ Referral link olishda xatolik yuz berdi.")
+
+
 @router.callback_query(F.data.startswith("copy_ref_"))
 async def copy_referral_link(callback: types.CallbackQuery):
     try:
