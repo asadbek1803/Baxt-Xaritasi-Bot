@@ -510,11 +510,10 @@ async def confirm_user_activity(callback: types.CallbackQuery):
             await callback.answer("❌ Bu tugma siz uchun emas!", show_alert=True)
             return
 
-        user = TelegramUser.objects.get(telegram_id=user_id)
+        user = await TelegramUser.objects.aget(telegram_id=user_id)
         user.is_active = True
         user.deadline_for_activation = None
-        user.last_activity_check = timezone.now()
-        user.save()
+        await user.asave()
 
         print(f"[DEBUG] User {user_id} activity confirmed successfully")
 
