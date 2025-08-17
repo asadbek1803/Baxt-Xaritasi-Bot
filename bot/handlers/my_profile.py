@@ -13,6 +13,14 @@ from bot.buttons.default.back import get_back_keyboard
 router = Router()
 
 
+# Test handler to verify callback queries are working
+@router.callback_query(F.data == "test_callback")
+async def test_callback(callback: types.CallbackQuery):
+    """Test callback handler"""
+    print(f"[DEBUG] Test callback received from user {callback.from_user.id}")
+    await callback.answer("Test callback working!", show_alert=True)
+
+
 def format_user_level(level: str) -> str:
     """
     level may be 'level_1' or '1-bosqich' or None -> return 'N-bosqich' style
@@ -111,10 +119,11 @@ async def my_profile_handler(message: types.Message, bot: Bot):
 
         # Tugmalar faqat referral_code mavjud bo'lsa ko'rsatiladi
         if user_data.get("referral_code"):
+            print(f"[DEBUG] Creating statistics button for user {user_id}")
             builder.row(
                 types.InlineKeyboardButton(
                     text="📊 Statistikani ko'rish",
-                    callback_data=f"stats_{user_data['telegram_id']}",
+                    callback_data="stats",
                 )
             )
 
@@ -169,10 +178,10 @@ async def copy_referral_link(callback: types.CallbackQuery):
             return
 
         referral_link = await get_referral_link_for_user(user_id)
-        
+
         # Share button tugmasi yaratish
         builder = InlineKeyboardBuilder()
-        
+
         # Referral link va reklama matni
         share_text = (
             f"🎯 Pul ishlash imkoniyati!\n\n"
@@ -183,23 +192,18 @@ async def copy_referral_link(callback: types.CallbackQuery):
         )
         builder.row(
             types.InlineKeyboardButton(
-                text="📤 Ulashish",
-                switch_inline_query=share_text
+                text="📤 Ulashish", switch_inline_query=share_text
             )
         )
         # Linkni nusxalash tugmasi
         builder.row(
             types.InlineKeyboardButton(
-                text="📋 Linkni nusxalash",
-                callback_data=f"copy_link_{user_id}"
+                text="📋 Linkni nusxalash", callback_data=f"copy_link_{user_id}"
             )
         )
         # Ortga qaytish tugmasi
         builder.row(
-            types.InlineKeyboardButton(
-                text="🔙 Ortga",
-                callback_data="back_to_profile"
-            )
+            types.InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_profile")
         )
 
         await callback.message.edit_text(
@@ -210,7 +214,7 @@ async def copy_referral_link(callback: types.CallbackQuery):
             f"📋 <b>Nusxalash:</b> Linkni nusxalab olish uchun tegishli tugmani bosing\n\n"
             f"💡 <b>Maslahat:</b> Link orqali ro'yxatdan o'tgan har bir yangi foydalanuvchi uchun bonus olasiz!",
             parse_mode="HTML",
-            reply_markup=builder.as_markup()
+            reply_markup=builder.as_markup(),
         )
         await callback.answer()
 
@@ -220,6 +224,7 @@ async def copy_referral_link(callback: types.CallbackQuery):
 
 
 # Qo'shimcha callback handlerlar
+
 
 @router.callback_query(F.data.startswith("copy_link_"))
 async def copy_link_only(callback: types.CallbackQuery):
@@ -232,18 +237,101 @@ async def copy_link_only(callback: types.CallbackQuery):
         user_id = parts[2]
 
         referral_link = await get_referral_link_for_user(user_id)
-        
-        await callback.answer(
-            f"📋 Link nusxalandi:\n{referral_link}", 
-            show_alert=True
-        )
+
+        await callback.answer(f"📋 Link nusxalandi:\n{referral_link}", show_alert=True)
 
     except Exception as e:
         print(f"[copy_link_only] Error: {e}")
         await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)
 
 
-@router.callback_query(F.data.startswith("stats"))
+@router.callback_query(F.data == "stats")
+async def show_user_stats(callback: types.CallbackQuery):
+    """Foydalanuvchi statistikasini ko'rsatish"""
+    print(f"[DEBUG] Statistics button clicked by user {callback.from_user.id}")
+    print(f"[DEBUG] Callback data: {callback.data}")
+    print(f"[DEBUG] Callback message ID: {callback.message.message_id}")
+    try:
+        user_id = str(callback.from_user.id)
+        print(f"[DEBUG] Getting profile data for user {user_id}")
+        user_data = await get_user_profile_by_telegram_id(user_id)
+
+        if not user_data:
+            print(f"[DEBUG] No user data found for user {user_id}")
+            await callback.answer("❌ Foydalanuvchi topilmadi!", show_alert=True)
+            return
+
+        print(f"[DEBUG] User data retrieved successfully for user {user_id}")
+
+        if not user_data.get("referral_code"):
+            print(f"[DEBUG] User {user_id} has no referral code")
+            await callback.answer(
+                "❌ Sizda referal kodi mavjud emas!",
+                show_alert=True,
+            )
+            return
+
+        print(
+            f"[DEBUG] User {user_id} has referral code: {user_data.get('referral_code')}"
+        )
+
+        stats_info = (
+            f"📊 <b>Foydalanuvchi statistikasi</b>\n\n"
+            f"👤 <b>{user_data['full_name']}</b>\n"
+            f"🆔 ID: <code>{user_data['telegram_id']}</code>\n\n"
+            f"👥 Taklif qilganlar soni: <b>{user_data['referral_count']} ta</b>\n"
+            f"📅 Ro'yxatdan o'tgan: <b>{user_data['registration_date']}</b>\n"
+            f"🎯 Level: <b>{user_data['level']}</b>\n"
+            f"✅ Status: <b>{'Tasdiqlangan' if user_data['is_confirmed'] else 'Tasdiqlanmagan'}</b>\n\n"
+        )
+        print(f"[DEBUG] Stats info created: {len(stats_info)} characters")
+
+        try:
+            print(f"[DEBUG] Getting referral link for user {user_data['telegram_id']}")
+            referral_link = await get_referral_link_for_user(user_data["telegram_id"])
+            stats_info += f"🔗 Referal link: <code>{referral_link}</code>"
+            print(f"[DEBUG] Referral link generated successfully: {referral_link}")
+        except Exception as e:
+            print(f"[show_user_stats] Error getting referral link: {e}")
+            stats_info += "🔗 Referal link: Xatolik"
+
+        # Create keyboard with back button
+        builder = InlineKeyboardBuilder()
+        builder.row(
+            types.InlineKeyboardButton(text="🔙 Ortga", callback_data="back_to_profile")
+        )
+        print(f"[DEBUG] Created back button with callback_data: back_to_profile")
+
+        print(f"[DEBUG] Sending statistics for user {user_id}")
+        try:
+            await callback.message.edit_text(
+                text=stats_info, parse_mode="HTML", reply_markup=builder.as_markup()
+            )
+            print(f"[DEBUG] Statistics edited successfully for user {user_id}")
+        except Exception as edit_error:
+            print(
+                f"[DEBUG] Edit failed for user {user_id}, sending new message: {edit_error}"
+            )
+            # Fallback: send new message if editing fails
+            await callback.message.answer(
+                text=stats_info, parse_mode="HTML", reply_markup=builder.as_markup()
+            )
+            print(f"[DEBUG] Statistics sent as new message for user {user_id}")
+
+        try:
+            await callback.answer()
+            print(f"[DEBUG] Callback answered successfully for user {user_id}")
+        except Exception as answer_error:
+            print(f"[DEBUG] Callback answer failed for user {user_id}: {answer_error}")
+
+        print(f"[DEBUG] Statistics sent successfully for user {user_id}")
+
+    except Exception as e:
+        print(f"[show_user_stats] Error: {e}")
+        await callback.answer("❌ Statistikani olishda xatolik!", show_alert=True)
+
+
+@router.callback_query(F.data == "back_to_profile")
 async def back_to_profile_handler(callback: types.CallbackQuery):
     """Profilga qaytish"""
     try:
@@ -288,7 +376,9 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
         # Referal link
         if user_data.get("referral_code"):
             try:
-                referral_link = await get_referral_link_for_user(user_data["telegram_id"])
+                referral_link = await get_referral_link_for_user(
+                    user_data["telegram_id"]
+                )
                 profile_info += f"└ Referal link: <code>{referral_link}</code>\n\n"
             except Exception as e:
                 print(f"Error getting referral link: {e}")
@@ -311,7 +401,7 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
             builder.row(
                 types.InlineKeyboardButton(
                     text="📊 Statistikani ko'rish",
-                    callback_data="ref_stats",
+                    callback_data="stats",
                 )
             )
 
@@ -320,49 +410,10 @@ async def back_to_profile_handler(callback: types.CallbackQuery):
         )
 
         await callback.message.edit_text(
-            text=profile_info,
-            parse_mode="HTML",
-            reply_markup=builder.as_markup()
+            text=profile_info, parse_mode="HTML", reply_markup=builder.as_markup()
         )
         await callback.answer()
 
     except Exception as e:
         print(f"[back_to_profile_handler] Error: {e}")
         await callback.answer("❌ Xatolik yuz berdi!", show_alert=True)
-    try:
-        user_id = callback.message.from_user.id
-
-        user_data = await get_user_profile_by_telegram_id(user_id)
-        if not user_data:
-            await callback.answer("❌ Foydalanuvchi topilmadi!", show_alert=True)
-            return
-
-        if not user_data.get("referral_code"):
-            await callback.answer(
-                "❌ Sizda referal kodi mavjud emas!",
-                show_alert=True,
-            )
-            return
-
-        stats_info = (
-            f"📊 <b>Foydalanuvchi statistikasi</b>\n\n"
-            f"👤 <b>{user_data['full_name']}</b>\n"
-            f"🆔 ID: <code>{user_data['telegram_id']}</code>\n\n"
-            f"👥 Taklif qilganlar soni: <b>{user_data['referral_count']} ta</b>\n"
-            f"📅 Ro'yxatdan o'tgan: <b>{user_data['registration_date']}</b>\n"
-            f"🎯 Level: <b>{user_data['level']}</b>\n"
-            f"✅ Status: <b>{'Tasdiqlangan' if user_data['is_confirmed'] else 'Tasdiqlanmagan'}</b>\n\n"
-        )
-
-        try:
-            referral_link = await get_referral_link_for_user(user_data["telegram_id"])
-            stats_info += f"🔗 Referal link: <code>{referral_link}</code>"
-        except Exception as e:
-            print(f"[show_user_stats] Error getting referral link: {e}")
-            stats_info += "🔗 Referal link: Xatolik"
-
-        await callback.message.answer(text=stats_info, parse_mode="HTML")
-        await callback.answer()
-    except Exception as e:
-        print(f"[show_user_stats] Error: {e}")
-        await callback.answer("❌ Statistikani olishda xatolik!", show_alert=True)
