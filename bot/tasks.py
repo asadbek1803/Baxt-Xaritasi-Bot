@@ -1,3 +1,4 @@
+import time
 from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
@@ -58,7 +59,8 @@ def check_active_users(self):
         print(
             f"[INFO] Checking {users_to_check.count()} users for activity confirmation"
         )
-
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         for user in users_to_check:
             try:
                 # Create inline keyboard with "Men aktivman" button
@@ -89,8 +91,8 @@ def check_active_users(self):
                         reply_markup=keyboard,
                     )
 
-                asyncio.run(send_activity_check())
-
+                loop.run_until_complete(send_activity_check())
+                time.sleep(1)  # Sleep to avoid hitting rate limits
                 # Update last activity check time
                 user.deadline_for_activation = deadline_for_activation
                 user.save()
@@ -102,7 +104,7 @@ def check_active_users(self):
                     f"[ERROR] Failed to send activity check to user {user.telegram_id}: {e}"
                 )
                 continue
-
+        loop.close()
     except Exception as e:
         print(f"[ERROR] Error in check_active_users: {e}")
 
@@ -116,7 +118,8 @@ def deactivate_inactive_users(self):
         inactive_users = TelegramUser.objects.filter(
             deadline_for_activation__date=deadline_for_activation.date(),
         )
-
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         print(f"[INFO] Deactivating {inactive_users.count()} inactive users")
         admin_user = TelegramUser.objects.filter(is_admin=True).first()
         for user in inactive_users:
@@ -133,18 +136,20 @@ def deactivate_inactive_users(self):
                     invitee.save()
 
                 # Notify user about deactivation
-                asyncio.run(
+
+                loop.run_until_complete(
                     bot.send_message(
                         chat_id=user.telegram_id,
                         text="❌ Siz 48 soat ichida aktivlik tasdiqlanmaganingiz uchun loyihamizdan chetlashtirildingiz.",
                     )
                 )
+                time.sleep(1)
 
                 print(f"[SUCCESS] User {user.telegram_id} deactivated")
 
             except Exception as e:
                 print(f"[ERROR] Failed to deactivate user {user.telegram_id}: {e}")
                 continue
-
+        loop.close()
     except Exception as e:
         print(f"[ERROR] Error in deactivate_inactive_users: {e}")
