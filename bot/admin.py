@@ -799,6 +799,10 @@ class LooserUserAdmin(ModelAdmin):
     ordering = ("-registration_date",)
     date_hierarchy = "registration_date"
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).filter(is_looser=True)
+        return qs
+
     # Fieldsets
     fieldsets = (
         ("Darajasi", {"fields": ("level",)}),
