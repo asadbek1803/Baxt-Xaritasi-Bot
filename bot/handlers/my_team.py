@@ -84,7 +84,7 @@ async def show_team_page(message_or_query, user_id: str, page: int = 0):
 
             text += f"{offset + i}. {status} <b>{referral.full_name}</b>\n"
             text += f"   📞 {referral.phone_number}\n"
-            text += f"   🏆 Daraja: {referral.level}\n"
+            text += f"   🏆 Daraja: {format_user_level(referral.level)}\n"
             text += f"   👥 Uning referallari: {ref_count} ta\n"
             text += f"   📅 Qo'shilgan: {referral.registration_date.strftime('%d.%m.%Y')}\n\n"
     else:
