@@ -2,13 +2,12 @@ from aiogram import types, F, Router
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest
 from datetime import datetime
+from bot.handlers.my_profile import format_user_level
 from bot.selectors import (
     get_user_referrals,
     get_user_referrals_count,
     get_user_referral_tree,
     get_confirmed_referrals_count,
-    get_referrals_by_level,
-    get_monthly_referrals_count,
 )
 import math
 from bot.buttons.default.back import get_back_keyboard
@@ -214,8 +213,7 @@ async def show_referral_tree(query: types.CallbackQuery, user_id: str):
     """Referal daraxtini ko'rsatish (3 daraja chuqurligida)"""
     tree_data = await get_user_referral_tree(user_id, depth=3)
 
-    text = "🌳 <b>Referal daraxti</b>\n"
-    text += f"🕐 <b>Yangilandi:</b> {datetime.now().strftime('%H:%M')}\n\n"
+    text = "🌳 <b>Referal daraxti</b>\n\n"
 
     if not tree_data:
         text += "🚫 Referal daraxtingiz bo'sh"
@@ -259,7 +257,7 @@ def format_referral_tree(tree_data: list, level: int = 0) -> str:
         status = "✅" if user.is_confirmed else "⏳"
         result += f"{prefix}{symbol} {status} <b>{user.full_name}</b>\n"
         result += f"{prefix}    📞 {user.phone_number}\n"
-        result += f"{prefix}    🏆 {user.level}\n"
+        result += f"{prefix}    🏆 {format_user_level(user.level)}\n"
 
         # Bolalar daraxtini ko'rsatish
         if children and level < 2:  # Faqat 3 daraja
