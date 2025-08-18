@@ -351,7 +351,7 @@ async def show_user_stats(callback: types.CallbackQuery):
             f"🆔 ID: <code>{user_data['telegram_id']}</code>\n\n"
             f"👥 Taklif qilganlar soni: <b>{user_data['referral_count']} ta</b>\n"
             f"📅 Ro'yxatdan o'tgan: <b>{user_data['registration_date']}</b>\n"
-            f"🎯 Level: <b>{user_data['level']}</b>\n"
+            f"🎯 Daraja: <b>{format_user_level(user_data['level'])}</b>\n"
             f"✅ Status: <b>{'Tasdiqlangan' if user_data['is_confirmed'] else 'Tasdiqlanmagan'}</b>\n\n"
         )
         print(f"[DEBUG] Stats info created: {len(stats_info)} characters")

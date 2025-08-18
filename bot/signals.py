@@ -1,6 +1,6 @@
-from datetime import datetime
 import requests
 import time
+from django.utils import timezone
 
 from asgiref.sync import async_to_sync
 from django.dispatch import receiver
@@ -30,7 +30,7 @@ def handle_payment_confirmation(sender, instance, created, **kwargs):
     if instance.status == "CONFIRMED":
         instance._signal_handled = True
 
-        if instance.user.is_looser and instance.user.inactive_time > datetime.now():
+        if instance.user.is_looser and instance.user.inactive_time > timezone.now():
             instance.user.is_looser = False
             instance.user.inactive_time = None
             instance.user.save()
