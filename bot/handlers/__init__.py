@@ -13,6 +13,7 @@ from .contact import router as contact_router
 from .project_about import router as project_about_router
 from .help import router as help_router
 from .gifts import router as gifts_router
+from .send_ad import router as send_ad_router
 
 
 router = Router()
@@ -32,6 +33,7 @@ router.include_router(contact_router)
 router.include_router(project_about_router)
 router.include_router(help_router)
 router.include_router(gifts_router)
+router.include_router(send_ad_router)
 
 
 
